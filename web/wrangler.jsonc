@@ -10,6 +10,8 @@
   "$schema": "https://unpkg.com/wrangler/config-schema.json",
   "name": "shopee-afl",
   "compatibility_date": "2026-09-01",
+  // สร้าง URL *.workers.dev ให้ด้วยตอน deploy ครั้งแรกหลังลบ Worker เก่าทิ้ง
+  "workers_dev": true,
   "build": {
     "command": "npm ci --no-audit --no-fund && npm run build"
   },
