@@ -54,6 +54,44 @@ Variables: `WATCH_KEYWORDS` = คีย์เวิร์ดที่เฝ้�
 2. **Zero Trust → Access → Add application** → policy: email = ของคุณคนเดียว  
    ทำข้อนี้แล้วไม่ต้องสร้างระบบ login เอง
 
+### 5.1 หน้าเว็บ (Vue SPA)
+
+```bash
+cd web
+npm install
+cp .env.example .env      # ใส่ VITE_SUPABASE_URL และ VITE_SUPABASE_ANON_KEY
+npm run dev
+```
+
+**ใช้ `anon` key เท่านั้น** — `service_role` ข้าม RLS ทั้งหมด ห้ามโผล่ใน frontend เด็ดขาด
+anon key ถูกฝังใน bundle เสมอ ตัวกันคนอื่นเข้าคือ Cloudflare Access ที่ครอบเว็บ ไม่ใช่ตัวคีย์
+
+**Cloudflare Pages** → Create project → เชื่อม repo นี้
+
+| ตั้งค่า | ค่า |
+|---|---|
+| Root directory | `web` |
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+| Environment variables | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
+
+`web/public/_redirects` มีกฎ SPA fallback ไว้แล้ว — ถ้าไม่มี การเปิด `/radar` ตรงๆ จะ 404
+
+**4 หน้าที่มี**
+
+| หน้า | ตอบคำถาม | อ่านจาก |
+|---|---|---|
+| สัปดาห์นี้ | สัปดาห์นี้ต้องทำอะไร | `tasks`, `conversions` |
+| เรดาร์ | ตัวไหนควรดัน ตัวไหนควรถอด | `products`, `v_commission_trend` |
+| พอร์ต | มุมไหนและสินค้าตัวไหนทำเงิน | `v_angle_performance`, `v_product_performance` |
+| คลิป | บันทึกคลิป + สร้าง subId ไปวางใน Shopee | `contents` |
+
+หน้า **คลิป** สร้าง `content_id` ให้และแสดง Sub_id ครบ 5 ช่องพร้อมปุ่มคัดลอก
+ใช้แทน Supabase Table Editor ได้เลย — ยังสร้างลิงก์เองไม่ได้ถ้าไม่มีคีย์ Open API
+แต่กรอกคลิปที่สร้างลิงก์ด้วยมือได้
+
+---
+
 ### 6. เริ่มถ่ายคลิปได้แล้ว
 ```bash
 npm run link -- --item=123456789 --platform=tt --angle=bna --placement=bio

@@ -267,3 +267,22 @@ alter default privileges in schema public grant select on tables to anon;
 drop policy if exists anon_toggle_task on tasks;
 create policy anon_toggle_task on tasks for update to anon using (true) with check (true);
 grant update (done) on tasks to anon;
+
+-- ─────────────────────────────────────────────
+-- 10. สิทธิ์เขียนสำหรับหน้าเว็บ (Vue SPA)
+--
+-- SPA ใช้ anon key เท่านั้น (service_role ห้ามโผล่ใน frontend เด็ดขาด)
+-- ตัวกันคนอื่นเข้าคือ Cloudflare Zero Trust Access ที่ครอบเว็บอยู่ ไม่ใช่ RLS
+-- เปิดเฉพาะที่หน้าเว็บต้องใช้จริง ไม่เปิดทั้งตาราง
+-- ─────────────────────────────────────────────
+
+-- contents — หน้า Content Log กรอก/แก้/ลบคลิปได้เอง (แทน Table Editor)
+drop policy if exists anon_write_contents on contents;
+create policy anon_write_contents on contents for all to anon using (true) with check (true);
+grant insert, update, delete on contents to anon;
+
+-- products — หน้า Radar ปรับสถานะและให้คะแนนเองได้
+-- grant ระบุ column → แก้ราคา/ยอดขายที่ ingest เขียนไว้ไม่ได้ ข้อมูลจาก API ไม่ถูกแตะ
+drop policy if exists anon_curate_products on products;
+create policy anon_curate_products on products for update to anon using (true) with check (true);
+grant update (status, my_score, note, retire_reason) on products to anon;
