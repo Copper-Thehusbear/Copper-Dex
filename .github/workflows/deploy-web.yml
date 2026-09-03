@@ -31,9 +31,11 @@ jobs:
         run: |
           missing=""
           [ -z "$CF_TOKEN" ] && missing="$missing CLOUDFLARE_API_TOKEN"
-          [ -z "$CF_ACCT" ]  && missing="$missing CLOUDFLARE_ACCOUNT_ID"
           [ -z "$SB_URL" ]   && missing="$missing VITE_SUPABASE_URL"
           [ -z "$SB_KEY" ]   && missing="$missing VITE_SUPABASE_ANON_KEY"
+          # CLOUDFLARE_ACCOUNT_ID ไม่บังคับ — ถ้ามีบัญชี Cloudflare เดียว wrangler หาเอง
+          # ต้องใส่เฉพาะตอน token เข้าถึงได้หลายบัญชี ซึ่งจะ error บอกเองตอน deploy
+          [ -z "$CF_ACCT" ] && echo "::notice::ไม่ได้ใส่ CLOUDFLARE_ACCOUNT_ID — ให้ wrangler หาบัญชีเอง"
           if [ -n "$missing" ]; then
             echo "::error::ยังไม่ได้ใส่ secret เหล่านี้ →$missing"
             echo "ใส่ที่ Settings → Secrets and variables → Actions → New repository secret"
