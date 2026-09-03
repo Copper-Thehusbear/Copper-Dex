@@ -211,3 +211,16 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
   .only-mobile { display: none; }
   .only-desk { display: block; }
 }
+
+/* ปุ่มตั้งค่า — ไม่เอาเข้า tab bar เพราะ 4 ช่องกำลังพอดีบนมือถือ */
+.gear { margin-left: auto; color: var(--muted); display: grid; place-items: center; padding: 6px; }
+.gear svg { width: 19px; height: 19px; }
+.gear.router-link-active { color: var(--accent); }
+@media (min-width: 860px) {
+  .gear { position: absolute; top: 20px; right: 12px; margin-left: 0; }
+  .topbar { position: relative; }
+}
+
+/* บรรทัดเช็คลิสต์: ห้าม wrap ไม่งั้นไอคอนหลุดไปอยู่คนละบรรทัดกับข้อความ */
+.checkline { display: flex; align-items: flex-start; gap: 8px; flex-wrap: nowrap; padding: 3px 0; font-size: 13px; }
+.checkline > span:first-child { flex: none; }

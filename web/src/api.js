@@ -91,6 +91,24 @@ export const api = {
     return run(sb.from('contents').delete().eq('content_id', contentId).select(), 'ลบคลิป');
   },
 
+  // ── การเชื่อมต่อ + โพสต์ ───────────────────
+  /** view นี้ไม่มี token — token อยู่ในตาราง integrations ที่ anon อ่านไม่ได้ */
+  integrations() {
+    return run(sb.from('v_integration_status').select('*'), 'โหลดการเชื่อมต่อ');
+  },
+
+  posts() {
+    return run(sb.from('posts').select('*').order('created_at', { ascending: false }), 'โหลดโพสต์');
+  },
+
+  savePost(row) {
+    return run(sb.from('posts').insert(row).select(), 'บันทึกโพสต์');
+  },
+
+  updatePost(id, patch) {
+    return run(sb.from('posts').update(patch).eq('id', id).select(), 'อัปเดตโพสต์');
+  },
+
   /** commission ต่อ content_id — ใช้โชว์ในหน้า Content Log */
   commissionByContent() {
     return run(sb.from('conversions').select('sub_id2,commission'), 'โหลด commission');

@@ -63,6 +63,10 @@ create table if not exists contents (
 );
 create index if not exists idx_contents_published on contents (published_at desc);
 
+-- เพิ่มทีหลังตอนทำหน้าเขียนแคปชัน — add column if not exists ทำให้รันซ้ำได้
+alter table contents add column if not exists keyword text;   -- คีย์เวิร์ดหลักที่ตั้งใจให้คนค้นเจอ
+alter table contents add column if not exists caption text;   -- แคปชันที่ใช้จริง
+
 -- ─────────────────────────────────────────────
 -- 4. links — ลิงก์ที่สร้างพร้อม subId (audit trail)
 -- ─────────────────────────────────────────────
@@ -286,3 +290,71 @@ grant insert, update, delete on contents to anon;
 drop policy if exists anon_curate_products on products;
 create policy anon_curate_products on products for update to anon using (true) with check (true);
 grant update (status, my_score, note, retire_reason) on products to anon;
+
+-- ─────────────────────────────────────────────
+-- 11. integrations — token ของ TikTok
+--
+-- ตารางนี้ anon ห้ามแตะเด็ดขาด refresh_token = สิทธิ์โพสต์ในนามคุณ
+-- Edge Function อ่าน/เขียนด้วย service_role เท่านั้น
+-- ─────────────────────────────────────────────
+create table if not exists integrations (
+  provider      text primary key,             -- 'tiktok'
+  open_id       text,
+  display_name  text,
+  avatar_url    text,
+  access_token  text,
+  refresh_token text,
+  expires_at    timestamptz,
+  scopes        text,
+  connected_at  timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+alter table integrations enable row level security;
+-- ไม่มี policy ให้ anon เลย = อ่านไม่ได้แม้ RLS จะเปิด
+
+-- ─────────────────────────────────────────────
+-- 12. posts — คลิปที่ส่งขึ้นแพลตฟอร์มแล้ว
+-- ─────────────────────────────────────────────
+create table if not exists posts (
+  id         bigserial primary key,
+  content_id text references contents(content_id) on delete set null,
+  provider   text not null default 'tiktok',
+  publish_id text,
+  status     text,                            -- PROCESSING_UPLOAD | PUBLISH_COMPLETE | FAILED
+  caption    text,
+  error      text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (provider, publish_id)
+);
+create index if not exists idx_posts_content on posts (content_id);
+alter table posts enable row level security;
+
+drop policy if exists anon_read_posts on posts;
+create policy anon_read_posts on posts for select to anon using (true);
+drop policy if exists anon_write_posts on posts;
+create policy anon_write_posts on posts for all to anon using (true) with check (true);
+grant select, insert, update on posts to anon;
+grant usage, select on sequence posts_id_seq to anon;
+
+-- ─────────────────────────────────────────────
+-- 13. สถานะการเชื่อมต่อที่หน้าเว็บอ่านได้ (ไม่มี token)
+--
+-- view นี้ตั้งใจให้เป็น security definer (ค่า default) — ตรงข้ามกับ 3 view ด้านบน
+-- เพราะต้องให้ anon เห็น "เชื่อมต่อแล้วหรือยัง" โดยที่อ่านตาราง integrations ไม่ได้
+-- Supabase Advisor จะเตือน view นี้ = ตั้งใจ ไม่ต้องแก้
+-- ─────────────────────────────────────────────
+drop view if exists v_integration_status;
+create view v_integration_status as
+select
+  provider,
+  display_name,
+  avatar_url,
+  scopes,
+  connected_at,
+  (expires_at is not null and expires_at > now()) as token_valid
+from integrations;
+
+-- กันพลาด: section 9 grant select ทุกตารางให้ anon ไปแล้ว ต้องถอนตารางนี้ออกทีหลัง
+revoke all on integrations from anon;
+grant select on v_integration_status to anon;

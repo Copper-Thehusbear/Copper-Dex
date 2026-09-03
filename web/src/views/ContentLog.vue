@@ -7,6 +7,8 @@ import {
   PLATFORMS, ANGLES, PLACEMENTS, platformLabel, angleLabel,
   isoWeek, newContentId,
 } from '../lib/taxonomy.js';
+import { buildCaption, hookOptions, beats, auditCaption, HOOK_SECONDS } from '../lib/caption.js';
+import { tiktokConfigured, uploadDraft, checkStatus, MAX_BYTES } from '../lib/tiktok.js';
 import EmptyState from '../components/EmptyState.vue';
 import AsyncBlock from '../components/AsyncBlock.vue';
 
@@ -18,6 +20,8 @@ const commissions = ref([]);
 const showForm = ref(false);
 const editing = ref(false);
 const copied = ref('');
+const tiktokReady = ref(false);
+const upload = ref({ file: null, step: '', error: '', publishId: '', status: '' });
 
 function blank() {
   return {
@@ -26,7 +30,9 @@ function blank() {
     angle: 'bna',
     batch: isoWeek(),
     placement: 'bio',
+    keyword: '',
     hook: '',
+    caption: '',
     item_ids: '',
     published_at: '',
     production_minutes: '',
@@ -39,8 +45,11 @@ async function load() {
   if (!configured) { loading.value = false; return; }
   loading.value = true; error.value = null;
   try {
-    const [c, m] = await Promise.all([api.contents(), api.commissionByContent()]);
+    const [c, m, integ] = await Promise.all([
+      api.contents(), api.commissionByContent(), api.integrations().catch(() => []),
+    ]);
     contents.value = c; commissions.value = m;
+    tiktokReady.value = tiktokConfigured && integ.some(i => i.provider === 'tiktok');
   } catch (e) { error.value = e; }
   finally { loading.value = false; }
 }
@@ -66,8 +75,49 @@ const subIds = computed(() => [
   form.platform, form.content_id, form.angle, form.batch, form.placement,
 ]);
 
+/** ── ตัวช่วยเขียน ─────────────────────────── */
+const hooks = computed(() => hookOptions({ angle: form.angle, keyword: form.keyword, price: '' }));
+const scriptBeats = computed(() => beats(form.angle));
+const suggested = computed(() => buildCaption({
+  angle: form.angle, keyword: form.keyword, placement: form.placement, price: '',
+}));
+const audit = computed(() => auditCaption({
+  caption: form.caption || suggested.value, keyword: form.keyword, hook: form.hook,
+}));
+const auditPassed = computed(() => audit.value.filter(i => i.ok).length);
+
+function useSuggestion() { form.caption = suggested.value; }
+
+/** ── อัปเข้า TikTok เป็นดราฟ ───────────────── */
+function pickFile(e) {
+  const f = e.target.files?.[0] ?? null;
+  upload.value = { ...upload.value, file: f, error: '', step: '' };
+}
+
+async function sendToTiktok() {
+  const u = upload.value;
+  u.error = ''; u.status = '';
+  try {
+    const { publish_id } = await uploadDraft(u.file, step => { u.step = step; });
+    u.publishId = publish_id;
+    await api.savePost({
+      content_id: form.content_id,
+      provider: 'tiktok',
+      publish_id,
+      status: 'PROCESSING_UPLOAD',
+      caption: form.caption || suggested.value,
+    });
+    const res = await checkStatus(publish_id);
+    u.status = res.status ?? 'PROCESSING_UPLOAD';
+  } catch (e) {
+    u.error = e.message;
+    u.step = '';
+  }
+}
+
 function openNew() {
   Object.assign(form, blank());
+  upload.value = { file: null, step: '', error: '', publishId: '', status: '' };
   editing.value = false; showForm.value = true;
 }
 
@@ -78,12 +128,15 @@ function openEdit(c) {
     angle: c.angle ?? 'bna',
     batch: c.batch ?? isoWeek(),
     placement: c.placement ?? 'bio',
+    keyword: c.keyword ?? '',
     hook: c.hook ?? '',
+    caption: c.caption ?? '',
     item_ids: (c.item_ids ?? []).join(', '),
     published_at: c.published_at ? c.published_at.slice(0, 16) : '',
     production_minutes: c.production_minutes ?? '',
     views: c.views ?? '',
   });
+  upload.value = { file: null, step: '', error: '', publishId: '', status: '' };
   editing.value = true; showForm.value = true;
 }
 
@@ -110,7 +163,9 @@ async function save() {
       angle: form.angle,
       batch: form.batch.trim() || null,
       placement: form.placement,
+      keyword: form.keyword.trim() || null,
       hook: form.hook.trim() || null,
+      caption: form.caption.trim() || null,
       item_ids: form.item_ids
         .split(',').map(s => s.trim()).filter(Boolean).map(Number).filter(n => Number.isFinite(n)),
       published_at: form.published_at ? new Date(form.published_at).toISOString() : null,
@@ -118,7 +173,8 @@ async function save() {
       views: numOrNull(form.views),
       metrics_updated_at: form.views === '' ? null : new Date().toISOString(),
     });
-    showForm.value = false;
+    // ไม่ปิดฟอร์ม — สลับเป็นโหมดแก้เพื่อให้อัปวิดีโอต่อได้ทันที
+    editing.value = true;
     await load();
   } catch (e) { error.value = e; }
   finally { saving.value = false; }
@@ -201,9 +257,56 @@ async function remove(c) {
         </div>
 
         <label class="field">
-          <span>hook / ประโยคเปิด</span>
-          <input v-model="form.hook" placeholder="เช่น ใช้มา 2 อาทิตย์ ผลลัพธ์คือ…" />
+          <span>คีย์เวิร์ดหลัก — คำที่คนจะพิมพ์ค้นหา ไม่ใช่ชื่อแบรนด์</span>
+          <input v-model="form.keyword" placeholder="เช่น ครีมกันแดด, หูฟังบลูทูธ" />
         </label>
+
+        <label class="field">
+          <span>hook — ประโยค {{ HOOK_SECONDS }} วิแรก</span>
+          <input v-model="form.hook" placeholder="พูดคีย์เวิร์ดออกเสียงในประโยคนี้ด้วย" />
+        </label>
+
+        <div v-if="form.keyword" class="row" style="margin:-4px 0 12px">
+          <button v-for="h in hooks" :key="h" type="button" class="btn sm ghost"
+                  style="text-align:left; white-space:normal" @click="form.hook = h">{{ h }}</button>
+        </div>
+
+        <!-- สคริปต์ + แคปชัน -->
+        <div class="card" style="background:var(--surface-2); box-shadow:none; margin-bottom:14px">
+          <div class="card-body">
+            <div class="spread" style="margin-bottom:10px">
+              <h3>โครงคลิป · มุม{{ angleLabel(form.angle) }}</h3>
+              <span class="pill" :class="auditPassed === audit.length ? 'good' : 'warn'">
+                {{ auditPassed }}/{{ audit.length }}
+              </span>
+            </div>
+
+            <div v-for="[t, what] in scriptBeats" :key="t" class="checkline" style="gap:10px">
+              <span class="mono muted" style="flex:none; width:62px">{{ t }}</span>
+              <span>{{ what }}</span>
+            </div>
+
+            <label class="field" style="margin:12px 0 8px">
+              <span>แคปชัน</span>
+              <textarea v-model="form.caption" rows="4"
+                        :placeholder="suggested"></textarea>
+            </label>
+            <div class="row" style="margin-bottom:12px">
+              <button class="btn sm" type="button" @click="useSuggestion">ใช้ที่แนะนำ</button>
+              <button class="btn sm ghost" type="button" @click="copy(form.caption || suggested)">
+                คัดลอกแคปชัน{{ copied === (form.caption || suggested) ? ' ✓' : '' }}
+              </button>
+            </div>
+
+            <div v-for="i in audit" :key="i.label" class="checkline">
+              <span style="flex:none">{{ i.ok ? '✅' : '⚠️' }}</span>
+              <span>
+                {{ i.label }}
+                <span v-if="!i.ok" class="muted" style="display:block; font-size:12.5px">{{ i.hint }}</span>
+              </span>
+            </div>
+          </div>
+        </div>
 
         <label class="field">
           <span>item_ids — รหัสสินค้าในคลิป คั่นด้วย ,</span>
@@ -230,7 +333,45 @@ async function remove(c) {
           <button class="btn primary" @click="save" :disabled="saving || !form.content_id.trim()">
             {{ saving ? 'กำลังบันทึก…' : 'บันทึก' }}
           </button>
-          <button class="btn ghost" @click="showForm = false">ยกเลิก</button>
+          <button class="btn ghost" @click="showForm = false">ปิด</button>
+        </div>
+
+        <!-- อัปขึ้น TikTok เป็นดราฟ -->
+        <div class="card" style="background:var(--surface-2); box-shadow:none; margin-top:14px">
+          <div class="card-body">
+            <div class="spread" style="margin-bottom:8px">
+              <h3>ส่งขึ้น TikTok เป็นดราฟ</h3>
+              <span class="pill">ไม่โพสต์เอง</span>
+            </div>
+
+            <p v-if="!tiktokReady" class="muted" style="font-size:13px">
+              ยังไม่ได้เชื่อมบัญชี TikTok — ไปที่หน้าตั้งค่า (ไอคอนเฟือง) เพื่อเชื่อมต่อก่อน
+            </p>
+
+            <p v-else-if="!editing" class="muted" style="font-size:13px">
+              กดบันทึกคลิปก่อน แล้วช่องอัปโหลดจะเปิดให้
+            </p>
+
+            <template v-else>
+              <p class="muted" style="font-size:13px; margin-bottom:10px">
+                ไฟล์วิ่งเข้า TikTok ตรงๆ ไม่ผ่านเซิร์ฟเวอร์เรา · ไม่เกิน
+                {{ Math.round(MAX_BYTES / 1048576) }}MB · ไปโผล่ใน inbox ให้คุณกดโพสต์เองในแอป
+              </p>
+              <input type="file" accept="video/*" @change="pickFile" style="margin-bottom:10px" />
+              <div class="row">
+                <button class="btn primary" type="button"
+                        :disabled="!upload.file || ['init','upload'].includes(upload.step)"
+                        @click="sendToTiktok">
+                  {{ { init: 'กำลังขอสิทธิ์อัป…', upload: 'กำลังส่งไฟล์…' }[upload.step] ?? 'ส่งเป็นดราฟ' }}
+                </button>
+                <span v-if="upload.status" class="pill good">{{ upload.status }}</span>
+              </div>
+              <div v-if="upload.error" class="banner bad" style="margin-top:10px">{{ upload.error }}</div>
+              <div v-else-if="upload.step === 'done'" class="banner" style="margin-top:10px">
+                ส่งแล้ว — เปิดแอป TikTok แล้วดูใน inbox เพื่อกดโพสต์
+              </div>
+            </template>
+          </div>
         </div>
       </div>
     </div>

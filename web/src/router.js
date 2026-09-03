@@ -7,6 +7,7 @@ export const router = createRouter({
     { path: '/radar',     component: () => import('./views/Radar.vue'),      meta: { title: 'เรดาร์' } },
     { path: '/portfolio', component: () => import('./views/Portfolio.vue'),  meta: { title: 'พอร์ต' } },
     { path: '/log',       component: () => import('./views/ContentLog.vue'), meta: { title: 'คลิป' } },
+    { path: '/settings',  component: () => import('./views/Settings.vue'), meta: { title: 'ตั้งค่า' } },
     { path: '/:rest(.*)', redirect: '/' },
   ],
 });
