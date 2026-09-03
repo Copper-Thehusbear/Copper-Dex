@@ -1,0 +1,226 @@
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f0f2f5;
+  --border: #e2e5ea;
+  --text: #14171c;
+  --muted: #6b7280;
+  --accent: #ee4d2d;          /* Shopee orange */
+  --accent-soft: #fdece7;
+  --good: #0f9d58;
+  --good-soft: #e6f4ec;
+  --warn: #b7791f;
+  --warn-soft: #fdf3e0;
+  --bad: #d93025;
+  --bad-soft: #fdecea;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgb(16 24 40 / .06), 0 1px 3px rgb(16 24 40 / .04);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --surface: #171a20;
+    --surface-2: #1e222a;
+    --border: #2a2f39;
+    --text: #e8eaed;
+    --muted: #9aa3b0;
+    --accent: #ff6b45;
+    --accent-soft: #3a1e17;
+    --good: #4ade80;
+    --good-soft: #14301f;
+    --warn: #fbbf24;
+    --warn-soft: #33280d;
+    --bad: #f87171;
+    --bad-soft: #3a1717;
+    --shadow: 0 1px 2px rgb(0 0 0 / .3);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai", "Sarabun", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -.01em; }
+h1 { font-size: 20px; }
+h2 { font-size: 16px; }
+h3 { font-size: 14px; }
+p { margin: 0; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+/* ── Layout ───────────────────────────────── */
+.shell { min-height: 100dvh; display: flex; flex-direction: column; }
+
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-top)) 16px;
+  padding-top: calc(12px + env(safe-area-inset-top));
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.topbar .mark {
+  width: 26px; height: 26px; border-radius: 7px; flex: none;
+  background: var(--accent); color: #fff;
+  display: grid; place-items: center; font-size: 13px; font-weight: 700;
+}
+.topbar .sub { color: var(--muted); font-size: 12px; }
+
+.content { flex: 1; padding: 16px; padding-bottom: 96px; max-width: 1100px; width: 100%; margin: 0 auto; }
+
+/* bottom tabs (มือถือ) */
+.tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  background: var(--surface); border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tabs a {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 9px 4px 10px; text-decoration: none; color: var(--muted);
+  font-size: 11px; font-weight: 550;
+}
+.tabs a.router-link-active { color: var(--accent); }
+.tabs svg { width: 20px; height: 20px; }
+
+@media (min-width: 860px) {
+  .shell { flex-direction: row; }
+  .topbar {
+    position: static; flex-direction: column; align-items: flex-start;
+    width: 216px; flex: none; border-right: 1px solid var(--border); border-bottom: 0;
+    padding: 20px 14px; gap: 4px;
+  }
+  .tabs {
+    position: static; grid-template-columns: 1fr; border: 0; background: transparent;
+    width: 100%; margin-top: 18px; gap: 2px;
+  }
+  .tabs a {
+    flex-direction: row; justify-content: flex-start; gap: 10px;
+    padding: 9px 10px; border-radius: 8px; font-size: 14px;
+  }
+  .tabs a.router-link-active { background: var(--accent-soft); }
+  .content { padding: 24px 28px; padding-bottom: 40px; }
+}
+
+/* ── Cards & tiles ────────────────────────── */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.stack > * + * { margin-top: 14px; }
+.card-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 14px 16px 0;
+}
+.card-head .hint { color: var(--muted); font-size: 12px; }
+.card-body { padding: 14px 16px; }
+
+.tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (min-width: 720px) { .tiles { grid-template-columns: repeat(4, 1fr); } }
+.tile { padding: 13px 14px; }
+.tile .k { color: var(--muted); font-size: 12px; }
+.tile .v { font-size: 22px; font-weight: 680; letter-spacing: -.02em; margin-top: 3px; }
+.tile .foot { color: var(--muted); font-size: 11px; margin-top: 2px; }
+
+/* ── Table ────────────────────────────────── */
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; white-space: nowrap; }
+th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-size: 12px; font-weight: 600; }
+tbody tr:last-child td { border-bottom: 0; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+
+/* ── Bits ─────────────────────────────────── */
+.pill {
+  display: inline-block; padding: 2px 8px; border-radius: 99px;
+  font-size: 11.5px; font-weight: 600; background: var(--surface-2); color: var(--muted);
+}
+.pill.good { background: var(--good-soft); color: var(--good); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad  { background: var(--bad-soft);  color: var(--bad); }
+.pill.accent { background: var(--accent-soft); color: var(--accent); }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 14px; border-radius: 9px; border: 1px solid var(--border);
+  background: var(--surface-2); cursor: pointer; font-size: 14px; font-weight: 560;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.ghost { background: transparent; }
+.btn.sm { padding: 5px 10px; font-size: 12.5px; border-radius: 7px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.field { display: block; margin-bottom: 12px; }
+.field > span { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 5px; }
+.field input, .field select, .field textarea {
+  width: 100%; padding: 9px 11px; border-radius: 9px;
+  border: 1px solid var(--border); background: var(--bg);
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent;
+}
+.grid2 { display: grid; gap: 0 12px; grid-template-columns: 1fr; }
+@media (min-width: 560px) { .grid2 { grid-template-columns: 1fr 1fr; } }
+
+.empty { padding: 34px 20px; text-align: center; }
+.empty .icon { font-size: 26px; }
+.empty h3 { margin: 10px 0 5px; }
+.empty p { color: var(--muted); font-size: 13.5px; max-width: 42ch; margin: 0 auto; }
+.empty .cta { margin-top: 14px; }
+
+.banner {
+  padding: 11px 14px; border-radius: 10px; font-size: 13.5px;
+  background: var(--warn-soft); color: var(--warn); border: 1px solid transparent;
+}
+.banner.bad { background: var(--bad-soft); color: var(--bad); }
+.banner + * { margin-top: 14px; }
+
+.muted { color: var(--muted); }
+.row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.spread { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+.check { width: 19px; height: 19px; accent-color: var(--accent); flex: none; }
+.done { color: var(--muted); text-decoration: line-through; }
+
+/* ── รายการแบบการ์ด (มือถือ) ─────────────── */
+.list { padding: 6px 12px 12px; }
+.item {
+  padding: 12px 2px; border-bottom: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.item:last-child { border-bottom: 0; }
+.item .title { font-weight: 580; }
+.item .meta { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 12.5px; color: var(--muted); }
+.item .meta b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.item .acts { display: flex; gap: 6px; margin-top: 2px; }
+
+.only-mobile { display: block; }
+.only-desk { display: none; }
+@media (min-width: 860px) {
+  .only-mobile { display: none; }
+  .only-desk { display: block; }
+}
+
+/* ปุ่มตั้งค่า — ไม่เอาเข้า tab bar เพราะ 4 ช่องกำลังพอดีบนมือถือ */
+.gear { margin-left: auto; color: var(--muted); display: grid; place-items: center; padding: 6px; }
+.gear svg { width: 19px; height: 19px; }
+.gear.router-link-active { color: var(--accent); }
+@media (min-width: 860px) {
+  .gear { position: absolute; top: 20px; right: 12px; margin-left: 0; }
+  .topbar { position: relative; }
+}
+
+/* บรรทัดเช็คลิสต์: ห้าม wrap ไม่งั้นไอคอนหลุดไปอยู่คนละบรรทัดกับข้อความ */
+.checkline { display: flex; align-items: flex-start; gap: 8px; flex-wrap: nowrap; padding: 3px 0; font-size: 13px; }
+.checkline > span:first-child { flex: none; }
