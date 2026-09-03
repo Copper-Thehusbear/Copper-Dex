@@ -138,50 +138,93 @@ on conflict (key) do nothing;
 -- 8. Views — คำถามที่สร้างระบบนี้มาเพื่อตอบ
 -- ─────────────────────────────────────────────
 
+-- drop ก่อนสร้างทุกครั้ง — `create or replace view` ปฏิเสธถ้า data type ของ column เปลี่ยน
+-- ทำให้แก้นิยาม view แล้วรัน schema ซ้ำไม่ผ่าน view ไม่มีข้อมูลของตัวเอง drop ได้ฟรี
+drop view if exists v_angle_performance;
+drop view if exists v_product_performance;
+drop view if exists v_commission_trend;
+
 -- มุมคอนเทนต์ไหนทำเงิน
+--
+-- รวมยอดต่อคลิปให้จบก่อนแล้วค่อยรวมต่อ angle
+-- ถ้า join contents กับ conversions ตรงๆ คลิปที่มี n ออเดอร์จะถูกนับ views ซ้ำ n รอบ
+-- → commission_per_1k_views ต่ำกว่าความจริง ยิ่งคลิปทำเงินดี ยิ่งเพี้ยนหนัก
 create or replace view v_angle_performance as
+with per_clip as (
+  select
+    c.content_id,
+    c.angle,
+    c.views,
+    count(cv.*)                     as conversions,
+    coalesce(sum(cv.commission), 0) as commission
+  from contents c
+  left join conversions cv on cv.sub_id2 = c.content_id
+  group by c.content_id, c.angle, c.views
+)
 select
-  c.angle,
-  count(distinct c.content_id)                              as clips,
-  coalesce(sum(c.views), 0)                                 as views,
-  count(cv.*)                                               as conversions,
-  coalesce(sum(cv.commission), 0)::numeric(12,2)            as commission,
-  case when coalesce(sum(c.views),0) > 0
-       then (coalesce(sum(cv.commission),0) * 1000
-             / sum(c.views))::numeric(12,2) end             as commission_per_1k_views,
-  case when count(distinct c.content_id) > 0
-       then (coalesce(sum(cv.commission),0)
-             / count(distinct c.content_id))::numeric(12,2) end as commission_per_clip
-from contents c
-left join conversions cv on cv.sub_id2 = c.content_id
-group by c.angle;
+  angle,
+  count(*)                                                as clips,
+  coalesce(sum(views), 0)                                 as views,
+  sum(conversions)::bigint                                as conversions,
+  sum(commission)::numeric(12,2)                          as commission,
+  case when coalesce(sum(views), 0) > 0
+       then (sum(commission) * 1000 / sum(views))::numeric(12,2) end as commission_per_1k_views,
+  (sum(commission) / count(*))::numeric(12,2)             as commission_per_clip
+from per_clip
+group by angle;
 
 -- สินค้าตัวไหนควรดัน ตัวไหนควรถอด
+--
+-- นับคลิปกับนับออเดอร์แยก lateral กัน
+-- ถ้า join ทั้งสองตารางพร้อมกันจะได้ cartesian product (3 คลิป × 4 ออเดอร์ = 12 แถว)
+-- → orders กับ commission พองตามจำนวนคลิป
 create or replace view v_product_performance as
 select
   p.item_id,
   p.name,
   p.status,
-  count(distinct c.content_id)                    as clips,
-  count(cv.*)                                     as orders,
-  coalesce(sum(cv.commission), 0)::numeric(12,2)  as commission,
-  max(c.published_at)                             as last_clip_at
+  cl.clips,
+  cv.orders,
+  cv.commission,
+  cl.last_clip_at
 from products p
-left join contents c    on p.item_id = any(c.item_ids)
-left join conversions cv on cv.item_id = p.item_id
-group by p.item_id, p.name, p.status;
+left join lateral (
+  select count(*) as clips, max(c.published_at) as last_clip_at
+  from contents c
+  where p.item_id = any(c.item_ids)
+) cl on true
+left join lateral (
+  select count(*) as orders, coalesce(sum(x.commission), 0)::numeric(12,2) as commission
+  from conversions x
+  where x.item_id = p.item_id
+) cv on true;
 
 -- commission rate เปลี่ยนไปยังไง (ใช้ตัดสินว่าร้านไหนกำลังดันของ)
+--
+-- เทียบด้วย "วันที่" ไม่ใช่ index ที่ 7 ของ array
+-- snapshot มีรูได้เสมอ (วันไหน job พังคือรูถาวร) index ที่ 7 จึงอาจเป็นข้อมูล 10 วันก่อน
+-- แล้วทำให้ query หา "คอมร่วง" ใน README เตือนผิด
 create or replace view v_commission_trend as
 select
-  item_id,
-  max(snap_date)                                                  as latest_date,
-  (array_agg(commission_rate order by snap_date desc))[1]         as latest_rate,
-  (array_agg(commission_rate order by snap_date desc))[7]         as rate_7d_ago,
-  (array_agg(price order by snap_date desc))[1]                   as latest_price,
-  (array_agg(price order by snap_date desc))[7]                   as price_7d_ago
-from product_snapshots
-group by item_id;
+  s.item_id,
+  s.snap_date        as latest_date,
+  s.commission_rate  as latest_rate,
+  w.commission_rate  as rate_7d_ago,
+  s.price            as latest_price,
+  w.price            as price_7d_ago
+from (
+  select distinct on (item_id) item_id, snap_date, commission_rate, price
+  from product_snapshots
+  order by item_id, snap_date desc
+) s
+left join lateral (
+  select p.commission_rate, p.price
+  from product_snapshots p
+  where p.item_id = s.item_id
+    and p.snap_date <= s.snap_date - 7
+  order by p.snap_date desc
+  limit 1
+) w on true;
 
 -- ─────────────────────────────────────────────
 -- 9. RLS + Grants

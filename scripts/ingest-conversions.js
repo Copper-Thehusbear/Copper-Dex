@@ -77,11 +77,7 @@ console.log(`   ตาราง conversions ตอนนี้: ${await db.count
 
 // เตือนถ้า subId หลุด — attribution พังเงียบๆ คือกับดักใหญ่สุดของระบบนี้
 if (totalRows > 0) {
-  const { createClient } = await import('@supabase/supabase-js');
-  const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY,
-    { auth: { persistSession: false } });
-  const { count } = await sb.from('conversions')
-    .select('*', { count: 'exact', head: true }).is('sub_id2', null);
+  const count = await db.countConversionsWithoutContent();
   if (count > 0) {
     console.warn(`⚠️ ${count} แถวไม่มี sub_id2 — attribution ต่อคลิปใช้ไม่ได้กับแถวพวกนี้`);
     console.warn('   เช็ค extractSubIds() ใน src/map.js เทียบกับ probe-conversions.json');

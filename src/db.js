@@ -61,6 +61,14 @@ export const db = {
     return data.map(r => r.item_id);
   },
 
+  /** conversion ที่ไม่มี sub_id2 = แถวที่ผูกกลับไปหาคลิปไม่ได้ */
+  async countConversionsWithoutContent() {
+    const { count, error } = await sb.from('conversions')
+      .select('*', { count: 'exact', head: true }).is('sub_id2', null);
+    if (error) throw new Error(`countConversionsWithoutContent: ${error.message}`);
+    return count;
+  },
+
   async count(table) {
     const { count, error } = await sb.from(table).select('*', { count: 'exact', head: true });
     if (error) throw new Error(`count ${table}: ${error.message}`);
