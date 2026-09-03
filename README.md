@@ -1,1 +1,97 @@
 # Shopee-Afl
+
+ระบบเก็บข้อมูล + attribution สำหรับ Shopee Affiliate — ฟรี 100%
+
+```
+GitHub Actions (cron)  →  Shopee Open API  →  Supabase Postgres
+                                                    ↓
+                          Cloudflare Pages (Vue) ← anon read-only
+                          Cloudflare Access = auth (ไม่ต้องเขียนเอง)
+```
+
+---
+
+## ทำตามลำดับนี้
+
+### 1. Supabase
+1. สร้าง project ใหม่ (อย่าใช้ร่วมกับ plzgo)
+2. SQL Editor → วางทั้งไฟล์ `supabase/schema.sql` → Run
+3. Project Settings → API → copy `URL` และ `service_role` key
+
+### 2. เครื่องตัวเอง
+```bash
+npm install
+cp .env.example .env      # ใส่ค่าให้ครบ
+npm run probe             # ← ขั้นที่เสี่ยงที่สุด ทำก่อนเสมอ
+```
+
+`probe` จะบอกว่า signature ผ่านไหม และ field จริงชื่ออะไร  
+**เทียบ `probe-*.json` กับ `src/map.js` ให้ตรงก่อน** แล้วค่อยไปข้อ 3
+
+### 3. รันจริง
+```bash
+npm run ingest:products
+npm run ingest:conversions -- --days=90    # backfill ครั้งแรก
+```
+
+### 4. GitHub Actions
+Settings → Secrets and variables → Actions
+
+| Secret | ค่า |
+|---|---|
+| `SHOPEE_APP_ID` | จาก Affiliate Open API |
+| `SHOPEE_SECRET` | จาก Affiliate Open API |
+| `SUPABASE_URL` | https://xxx.supabase.co |
+| `SUPABASE_SERVICE_KEY` | service_role |
+| `SUPABASE_DB_URL` | connection string (สำหรับ backup) |
+
+Variables: `WATCH_KEYWORDS` = คีย์เวิร์ดที่เฝ้า คั่นด้วย `,`
+
+แล้วกด Run workflow ด้วยมือ 1 ครั้งเพื่อดูว่าผ่าน
+
+### 5. Cloudflare
+1. Pages → เชื่อม repo นี้ → custom domain `aff.<โดเมน plzgo>`
+2. **Zero Trust → Access → Add application** → policy: email = ของคุณคนเดียว  
+   ทำข้อนี้แล้วไม่ต้องสร้างระบบ login เอง
+
+### 6. เริ่มถ่ายคลิปได้แล้ว
+```bash
+npm run link -- --item=123456789 --platform=tt --angle=bna --placement=bio
+```
+เอา `content_id` ที่ได้ไปกรอกในตาราง `contents` (Supabase → Table Editor)
+
+---
+
+## subId taxonomy — ห้ามเปลี่ยนหลังเริ่มยิงคลิป
+
+| ช่อง | ความหมาย | ค่า |
+|---|---|---|
+| subId1 | platform | `tt` `sv` `fb` `ig` `yt` |
+| subId2 | content_id | `c260903abc` |
+| subId3 | angle | `bna` ก่อน-หลัง / `unb` แกะกล่อง / `prb` แก้ปัญหา / `cmp` เทียบ / `lst` รวม |
+| subId4 | batch | `26w36` |
+| subId5 | placement | `bio` `pin` `cmt` `desc` |
+
+**attribution ย้อนหลังไม่ได้** คลิปที่ยิงด้วยลิงก์เปล่า = ข้อมูลหายถาวร
+
+---
+
+## คำถามที่ระบบตอบให้ได้
+
+```sql
+select * from v_angle_performance order by commission_per_clip desc nulls last;
+select * from v_product_performance where clips >= 3 and orders = 0;  -- ควรถอด
+select * from v_commission_trend where latest_rate < rate_7d_ago * 0.7;  -- คอมร่วง
+```
+
+---
+
+## ข้อควรรู้ / ข้อจำกัดที่ตั้งใจไว้แบบนี้
+
+- `product_snapshots` เป็น append-only — **สร้างย้อนหลังไม่ได้** วันไหน job พังคือรูถาวร ตั้ง notification ของ GitHub ให้ส่งเมลเมื่อ workflow แดง
+- `conversionReport` ดึงได้ครั้งละไม่เกิน ~90 วัน (สคริปต์หั่น chunk ให้แล้ว) และ `scrollId` ตายใน 30 วิ จึงไม่มี sleep ระหว่างหน้า
+- PK ของ `conversions` คือ `(conversion_id, item_id)` — ตั้งบนสมมติฐานว่า 1 conversion ไม่มี itemId ซ้ำข้าม order ถ้า probe เจอว่าซ้ำได้จริง ให้เพิ่ม `order_id` เข้า PK
+- `raw jsonb` เก็บ response ทั้งก้อนเสมอ ถ้า mapping ผิดก็ยัง re-map จากของเดิมได้
+- `service_role` key ข้าม RLS ทั้งหมด → อยู่ใน GitHub Secrets เท่านั้น **ห้ามใส่ใน frontend**
+- Supabase free tier ไม่มี backup → `weekly-backup` workflow จำเป็น ไม่ใช่ของแถม
+- ชื่อ field ใน `src/shopee.js` และ `src/map.js` อิงเอกสาร Open API **ยังไม่ผ่านการยืนยันกับ response จริง** — `npm run probe` มีไว้เพื่อการนี้
