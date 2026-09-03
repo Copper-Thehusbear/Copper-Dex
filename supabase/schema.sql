@@ -226,6 +226,15 @@ left join lateral (
   limit 1
 ) w on true;
 
+-- view ต้องเป็น security_invoker
+--
+-- ค่า default ของ Postgres คือ view รันด้วยสิทธิ์ของ "เจ้าของ view" ไม่ใช่คนที่ query
+-- แปลว่า anon อ่าน view แล้วข้าม RLS ของตารางข้างใต้ไปเลย (Supabase Advisor ขึ้น CRITICAL)
+-- ตั้งเป็น on เพื่อให้ anon อ่าน view แล้วยังโดน RLS ของ products/contents/conversions ตามปกติ
+alter view v_angle_performance   set (security_invoker = on);
+alter view v_product_performance set (security_invoker = on);
+alter view v_commission_trend    set (security_invoker = on);
+
 -- ─────────────────────────────────────────────
 -- 9. RLS + Grants
 --    Frontend อยู่หลัง Cloudflare Access อยู่แล้ว → anon อ่านอย่างเดียวพอ
