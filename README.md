@@ -75,7 +75,7 @@ anon key ถูกฝังใน bundle เสมอ ตัวกันคน�
 | Build output directory | `dist` |
 | Environment variables | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
 
-`web/public/_redirects` มีกฎ SPA fallback ไว้แล้ว — ถ้าไม่มี การเปิด `/radar` ตรงๆ จะ 404
+`web/wrangler.jsonc` ตั้ง `not_found_handling: single-page-application` ไว้แล้ว — ถ้าไม่มี การเปิด `/radar` ตรงๆ จะ 404
 
 **4 หน้าที่มี**
 
