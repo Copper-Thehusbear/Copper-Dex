@@ -1,0 +1,14 @@
+{
+  // ตั้งค่า Cloudflare Worker ที่เสิร์ฟไฟล์ static ของ SPA
+  //
+  // not_found_handling: "single-page-application" คือตัวสำคัญ
+  // ถ้าไม่มี การเปิด /radar หรือ /log ตรงๆ จะได้ 404 เพราะไฟล์พวกนั้นไม่มีอยู่จริง
+  // มีแค่ index.html ที่ให้ vue-router จัดการ route เอง
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "shopee-afl",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
