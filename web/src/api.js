@@ -55,6 +55,16 @@ export const api = {
     );
   },
 
+  /** เกณฑ์คัดสินค้า — อยู่ใน DB เพื่อให้ปรับได้โดยไม่ต้อง deploy */
+  config() {
+    return run(sb.from('config').select('key,value'), 'โหลดค่าตั้งต้น');
+  },
+
+  /** เพิ่มสินค้าที่หาเจอเองจากหน้า Shopee Affiliate */
+  addProduct(row) {
+    return run(sb.from('products').insert(row).select(), 'เพิ่มสินค้า');
+  },
+
   commissionTrend() {
     return run(sb.from('v_commission_trend').select('*'), 'โหลด commission trend');
   },

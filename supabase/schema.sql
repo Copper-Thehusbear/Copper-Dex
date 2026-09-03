@@ -291,6 +291,16 @@ drop policy if exists anon_curate_products on products;
 create policy anon_curate_products on products for update to anon using (true) with check (true);
 grant update (status, my_score, note, retire_reason) on products to anon;
 
+-- products (insert) — เพิ่มสินค้าที่หาเจอเองจากหน้า Shopee Affiliate
+--
+-- จำเป็นเพราะ ingest-products.js ต้องใช้คีย์ Open API ซึ่งอาจยังไม่มี
+-- ถ้าเพิ่มเองไม่ได้ ระบบจะไม่มีทางเข้าเลย: ไม่มีสินค้า → ไม่มีคลิป → ไม่มีข้อมูล
+-- พอ ingest ทำงานได้ มันจะ upsert ทับด้วยราคา/ยอดขายจริงจาก API ให้เอง
+drop policy if exists anon_add_products on products;
+create policy anon_add_products on products for insert to anon with check (true);
+grant insert (item_id, name, image_url, offer_link, price, commission_rate,
+              rating_star, sales, status, my_score, note) on products to anon;
+
 -- ─────────────────────────────────────────────
 -- 11. integrations — token ของ TikTok
 --
