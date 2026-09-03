@@ -1,13 +1,20 @@
 {
   // ตั้งค่า Cloudflare Worker ที่เสิร์ฟไฟล์ static ของ SPA
   //
-  // not_found_handling: "single-page-application" คือตัวสำคัญ
-  // ถ้าไม่มี การเปิด /radar หรือ /log ตรงๆ จะได้ 404 เพราะไฟล์พวกนั้นไม่มีอยู่จริง
-  // มีแค่ index.html ที่ให้ vue-router จัดการ route เอง
+  // build.command อยู่ตรงนี้เพราะมี "ตัว deploy สองทาง" ได้:
+  //   1. GitHub Actions (deploy-web.yml) — ทางหลัก
+  //   2. Cloudflare Workers Builds — ถูกสร้างอัตโนมัติตอนกด Connect to Git ใน dashboard
+  // ถ้าทางที่ 2 ไม่รู้จักคำสั่ง build มันจะเอาโฟลเดอร์ซอร์สขึ้นแทน dist
+  // แล้วเบราว์เซอร์จะโหลด /src/main.js ดิบๆ → "Module name 'vue' does not resolve"
+  // ใส่ไว้ตรงนี้ = ทั้งสองทางได้ผลเหมือนกัน
   "$schema": "https://unpkg.com/wrangler/config-schema.json",
   "name": "shopee-afl",
   "compatibility_date": "2026-09-01",
+  "build": {
+    "command": "npm ci --no-audit --no-fund && npm run build"
+  },
   "assets": {
+    // ต้องเป็น dist เท่านั้น — ชี้ไปที่ "." เมื่อไหร่คือเสิร์ฟซอร์สดิบ
     "directory": "./dist",
     "not_found_handling": "single-page-application"
   }

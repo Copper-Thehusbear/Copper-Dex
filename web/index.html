@@ -52,9 +52,18 @@
             }) + '</pre>';
         }
 
+        // อาการเฉพาะ: เสิร์ฟโฟลเดอร์ซอร์สแทน dist → เบราว์เซอร์เจอ import 'vue' ดิบๆ
+        function isRawSource(msg) {
+          return /does not resolve to a valid URL|Failed to resolve module|bare specifier|Relative references must start/i.test(msg);
+        }
+
         window.addEventListener('error', function (e) {
           if (e.target && e.target.tagName === 'SCRIPT') {
             report('โหลดไฟล์โปรแกรมไม่ได้', 'โหลดไม่สำเร็จ: ' + (e.target.src || '(ไม่ทราบ)'));
+          } else if (isRawSource(e.message || '')) {
+            report('deploy ผิดโฟลเดอร์',
+              'เว็บนี้กำลังเสิร์ฟโค้ดต้นฉบับแทนไฟล์ที่ build แล้ว\n' +
+              'ต้องชี้ assets ไปที่ web/dist ไม่ใช่ web/\n\n' + (e.message || ''));
           } else {
             report('แอปพัง', (e.message || 'unknown') + '\n' + (e.filename || '') + ':' + (e.lineno || ''));
           }

@@ -79,7 +79,15 @@ jobs:
           fi
           echo "bundle ผ่าน"
 
+      # wrangler.jsonc มี build.command อยู่ → wrangler จะ build ซ้ำอีกรอบ
+      # ต้องส่ง VITE_* ให้ step นี้ด้วย ไม่งั้น build รอบสองจะไม่มีคีย์ Supabase
+      # แล้วได้เว็บที่เปิดได้แต่ต่อฐานข้อมูลไม่ติด
       - uses: cloudflare/wrangler-action@v3
+        env:
+          VITE_SUPABASE_URL:      ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_TIKTOK_FN_URL:     ${{ secrets.VITE_TIKTOK_FN_URL }}
+          VITE_APP_TOKEN:         ${{ secrets.VITE_APP_TOKEN }}
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
