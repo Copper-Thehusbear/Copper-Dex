@@ -1,23 +1,22 @@
 # Copper Dex
+Pokédex-inspired custom Android TV home launcher for TCL V6C (55-inch), preserving Copper's red clamshell concept.
 
-Custom Pokédex-inspired Android TV home launcher for **TCL V6C 55-inch Google TV**.
+## State
+**Source prototype only; APK NOT YET BUILT or tested on device.** There is no system debloat or stock launcher modification. UI uses offline HTML/CSS/JS loaded into a native Java WebView host. It dynamically discovers launchable apps on Android TV and accepts D-pad / OK / Back controls. Open with desktop browser to view a demo (demo tiles don't launch apps).
 
-This branch replaces the former Shopee Affiliate codebase, workflows and database configuration. The starter application has an animated clamshell-style red shell, blue glass dual displays, D-pad navigation, live clock, Android TV application discovery, app launching, settings and Wi-Fi shortcuts.
+## Build / test
+Install JDK 17, Android SDK Platform 34 and Android build-tools, and Gradle 8.7 or use Android Studio's Gradle integration. In repository root: `gradle assembleDebug` (or use Android Studio Build APK). Output: `app/build/outputs/apk/debug/app-debug.apk`. No Gradle wrapper JAR is committed. Add one with `gradle wrapper --gradle-version 8.7` if desired.
 
-Inspired by Gathin23/tv-vibehack (MIT). This is an independent implementation, not a vendored copy of their launcher. The UI is an initial functional adaptation of Copper's HTML concept; it is not yet a pixel-perfect translation of the complete original design.
+Use `adb connect TV_IP:5555` only after enabling debugging on TV and accepting pairing prompts. Use `adb install -r app/build/outputs/apk/debug/app-debug.apk` and launch Copper Dex via Apps. Do not set it as default Home until fully tested. Uninstall with `adb uninstall com.copper.dex`. Check firmware compatibility before switching Home.
 
-## Build
-Install Android Studio, JDK 17, and Android SDK Platform 34. Open this folder as a Gradle project, sync, and build the `app` module. This project requires Gradle 8.7 (Android Studio can install the matching Gradle distribution). Debug APK path: `app/build/outputs/apk/debug/app-debug.apk`.
+## UI and integration
+- `app/src/main/assets/index.html`, `style.css`, `app.js`: Copper Dex red chassis, opening flap, dual screen, live clock, dynamic 4x3 grid with pages, app preview and system buttons.
+- `app/src/main/java/com/copper/dex/MainActivity.java`: Android TV bridge, icon generation, app launches and D-pad handling.
+- Offline asset files. A local Chakra Petch font can be added via licensed assets in a subsequent iteration; currently uses system fallback.
+- Base project is an independent implementation inspired by tv-vibehack; source attribution is not a claim of code import.
 
-Install with `adb install -r app/build/outputs/apk/debug/app-debug.apk`, then launch Copper Dex from Apps. Test D-pad and OK, application launching, and returning to Home before assigning this application as the default launcher.
-
-## Safety
-No ADB debloating, no removal or disabling of vendor packages, no forced home selection, no network permission. The original launcher remains installed. Reset the default Home in system settings or uninstall with `adb uninstall com.copper.dex`.
-
-## UI & platform
-- `app/src/main/assets/index.html`: offline interface. Replace it with Copper's full original HTML once app bridge integration is complete.
-- `app/src/main/java/com/copper/dex/MainActivity.java`: WebView host, Android package discovery and launch bridge.
-- `CopperDex.apps()` returns JSON with launchable app labels, package names and base64 PNG icons.
-- `CopperDex.open(pkg)`, `CopperDex.settings()`, `CopperDex.wifi()`, `CopperDex.inputs()`.
-
-Limitations: the device firmware may restrict changing inputs and third-party Home selection. WebView 3D animation performance must be profiled on hardware. No TV tested yet.
+## Known issues and next checks
+- UI is a closer functional interpretation, not exact line-by-line import of the user-supplied HTML; further fidelity work is needed.
+- Verify TV remote focus, performance and HDMI/input settings across TCL firmware.
+- Build/compile has not been executed and may reveal integration issues.
+- Launcher is not configured as default and no debloat operations are included.
