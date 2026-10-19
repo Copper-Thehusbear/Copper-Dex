@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.content.Intent;
 import android.content.ComponentName;
+import android.webkit.WebResourceRequest;
+import android.graphics.Color;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
@@ -34,7 +36,8 @@ public class MainActivity extends Activity {
   web.getSettings().setAllowFileAccess(false);
   web.getSettings().setAllowContentAccess(false);
   web.getSettings().setDomStorageEnabled(false);
-  web.setWebViewClient(new WebViewClient());
+  web.setBackgroundColor(Color.BLACK);
+  web.setWebViewClient(new WebViewClient(){@Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request){return true;}});
   web.addJavascriptInterface(new Bridge(),"CopperDex");
   setContentView(web);
   web.loadUrl("file:///android_asset/index.html");

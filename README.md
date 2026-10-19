@@ -1,22 +1,23 @@
-# Copper Dex
-Pokédex-inspired custom Android TV home launcher for TCL V6C (55-inch), preserving Copper's red clamshell concept.
+# Copper Dex — Immersive Pokédex Android TV Launcher
 
-## State
-**Source prototype only; APK NOT YET BUILT or tested on device.** There is no system debloat or stock launcher modification. UI uses offline HTML/CSS/JS loaded into a native Java WebView host. It dynamically discovers launchable apps on Android TV and accepts D-pad / OK / Back controls. Open with desktop browser to view a demo (demo tiles don't launch apps).
+Target: TCL V6C Google TV 55-inch. Native Java Android host with a local HTML/CSS/JS UI.
 
-## Build / test
-Install JDK 17, Android SDK Platform 34 and Android build-tools, and Gradle 8.7 or use Android Studio's Gradle integration. In repository root: `gradle assembleDebug` (or use Android Studio Build APK). Output: `app/build/outputs/apk/debug/app-debug.apk`. No Gradle wrapper JAR is committed. Add one with `gradle wrapper --gradle-version 8.7` if desired.
+## Implemented in source
+- Initial **closed Pokédex** with animated blue orb (breathing + scan sweep) and premium molded-shell effects.
+- First **OK** opens the Pokédex; **Back** closes it.
+- Animated 3D flap opens to a dual screen: left focused-app preview and right 4-column vertically scrollable app grid.
+- App selection via D-pad and OK; the launcher performs zoom-to-left-display / fade-to-black before launching the actual Android TV app.
+- Pokédex-themed Settings overlay with animation toggle, Wi-Fi, TV Inputs, and Android system Settings handoffs.
+- Dynamic app discovery via PackageManager, clock, preview icons, browser preview fallback.
+- Reduced-motion handling for CSS effects.
 
-Use `adb connect TV_IP:5555` only after enabling debugging on TV and accepting pairing prompts. Use `adb install -r app/build/outputs/apk/debug/app-debug.apk` and launch Copper Dex via Apps. Do not set it as default Home until fully tested. Uninstall with `adb uninstall com.copper.dex`. Check firmware compatibility before switching Home.
+## Not yet verified
+No APK has been built or tested on actual TCL hardware. CSS 3D graphics on Android WebView, launcher behavior, transitions, package visibility, input intents and performance need hardware validation. The themed Settings overlay is an application-level hub: Android's own Settings, permission prompts, and firmware UI cannot be replaced by a regular third-party app.
 
-## UI and integration
-- `app/src/main/assets/index.html`, `style.css`, `app.js`: Copper Dex red chassis, opening flap, dual screen, live clock, dynamic 4x3 grid with pages, app preview and system buttons.
-- `app/src/main/java/com/copper/dex/MainActivity.java`: Android TV bridge, icon generation, app launches and D-pad handling.
-- Offline asset files. A local Chakra Petch font can be added via licensed assets in a subsequent iteration; currently uses system fallback.
-- Base project is an independent implementation inspired by tv-vibehack; source attribution is not a claim of code import.
+## Build
+Open repository in Android Studio, install JDK 17 and Android SDK 34, use Gradle 8.7, and build `app` debug APK. A Gradle wrapper is not included yet. The debug build should be installed as a normal app first (do **not** disable stock Home). See actual device-specific pairing and firmware restrictions before assigning as HOME.
 
-## Known issues and next checks
-- UI is a closer functional interpretation, not exact line-by-line import of the user-supplied HTML; further fidelity work is needed.
-- Verify TV remote focus, performance and HDMI/input settings across TCL firmware.
-- Build/compile has not been executed and may reveal integration issues.
-- Launcher is not configured as default and no debloat operations are included.
+No debloat operations are performed by this repository; the stock launcher is untouched.
+
+## Follow-up QA
+Compile, test the closed→OK→open state, Back handling, D-pad grid scrolling, app launch resume, Settings navigation, and failure recovery on TCL. Revisit premium panel fidelity against the user-provided original Pokédex design and profile GPU usage on 4K/60Hz display.
