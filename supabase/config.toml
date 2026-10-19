@@ -1,5 +1,0 @@
-# Edge Function ของ TikTok ต้องปิด verify_jwt เพราะ /auth/callback
-# ถูกเรียกจาก TikTok ซึ่งไม่มี JWT ของ Supabase ติดมาด้วย
-# route ที่หน้าเว็บเรียกใช้ตรวจ header x-app-token เองแทน (ดู authed() ในโค้ด)
-[functions.tiktok]
-verify_jwt = false
