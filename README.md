@@ -21,3 +21,13 @@ No debloat operations are performed by this repository; the stock launcher is un
 
 ## Follow-up QA
 Compile, test the closed→OK→open state, Back handling, D-pad grid scrolling, app launch resume, Settings navigation, and failure recovery on TCL. Revisit premium panel fidelity against the user-provided original Pokédex design and profile GPU usage on 4K/60Hz display.
+
+## Automated APK Build
+GitHub Actions workflow `.github/workflows/build-apk.yml` assembles debug APK on pushes and manual workflow runs. Download `Copper-Dex-debug-apk` from the successful run's Artifacts section. Never publish a debug APK as a signed release.
+
+## Device smoke test (no default Home change)
+1. Enable developer debugging on the TCL television and approve the connected PC.
+2. Install with `adb install -r app-debug.apk`.
+3. Launch explicitly using `adb shell am start -n com.copper.dex/.MainActivity`.
+4. Verify initial closed cover, first OK opens, D-pad list, Wi-Fi and settings shortcuts, Back closes, and launch transition.
+5. Revert with `adb uninstall com.copper.dex`. Do not disable the stock Home launcher.

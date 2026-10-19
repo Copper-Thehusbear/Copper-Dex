@@ -3,7 +3,6 @@ package com.copper.dex;
 import android.app.Activity;
 import android.os.Bundle;
 import android.content.Intent;
-import android.content.ComponentName;
 import android.webkit.WebResourceRequest;
 import android.graphics.Color;
 import android.content.pm.PackageManager;
@@ -21,7 +20,6 @@ import android.view.View;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -90,5 +88,6 @@ public class MainActivity extends Activity {
    catch(Exception ignored){startActivity(new Intent(Settings.ACTION_SETTINGS));}
   });}
  }
+ @Override protected void onResume(){super.onResume();if(web!=null)web.evaluateJavascript("window.copperResume&&window.copperResume()",null);}
  @Override public void onBackPressed(){web.evaluateJavascript("window.copperBack&&window.copperBack()",null);}
 }

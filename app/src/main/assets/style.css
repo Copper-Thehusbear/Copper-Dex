@@ -36,3 +36,18 @@ body.launching #device{transform-origin:28% 49%;animation:screen-zoom .84s cubic
 @keyframes hint-pulse{50%{opacity:.42}}
 @keyframes screen-zoom{to{transform:scale(3.05) translate(16%,0);filter:brightness(1.45)}}
 @media(prefers-reduced-motion:reduce){.animated-orb,.orb-sweep,.cover-hint{animation:none!important}body.launching #device{animation:none}#launch-shade{transition-duration:.01s}}
+
+/* Correct clamshell pivot: a closed cover must fold over the left-hand base. */
+.right{transform:rotateY(-180deg)}
+.device.open .right{transform:rotateY(0deg)}
+.device{transition:left 1.35s cubic-bezier(.65,0,.35,1)}
+.device:not(.open){left:504px}
+.device.open{left:48px}
+.right .face{backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.lid{backface-visibility:hidden;-webkit-backface-visibility:hidden}
+/* Zoom to the real preview screen, then cover the entire display in black. */
+body.launching #device{transform-origin:25% 50%;animation:screen-zoom-target .95s cubic-bezier(.2,.75,.26,1) forwards}
+@keyframes screen-zoom-target{to{transform:translate(55%,0) scale(3.25);filter:brightness(1.15)}}
+#launch-shade{transition:opacity .45s ease .5s}
+body:not(.launching) #launch-shade{transition:opacity .2s ease}
+@media(prefers-reduced-motion:reduce){.right,.device{transition-duration:.01s}body.launching #device{animation:none}#launch-shade{transition:opacity .01s}}

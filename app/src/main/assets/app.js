@@ -1,7 +1,7 @@
 'use strict';
 const native=typeof window.CopperDex!=='undefined';
 const demo=[{name:'Netflix',pkg:'',icon:''},{name:'YouTube',pkg:'',icon:''},{name:'Prime Video',pkg:'',icon:''},{name:'Disney+',pkg:'',icon:''},{name:'Spotify',pkg:'',icon:''},{name:'Plex',pkg:'',icon:''},{name:'Browser',pkg:'',icon:''},{name:'Games',pkg:'',icon:''},{name:'Photos',pkg:'',icon:''},{name:'Files',pkg:'',icon:''},{name:'Cast',pkg:'',icon:''}];
-let apps=[],focused=0,area='grid',buttonIndex=0,state='closed',settingsFocus=0,animationEnabled=true,launchTimer=null;
+let apps=[],focused=0,area='grid',buttonIndex=0,state='closed',settingsFocus=0,animationEnabled=true,launchTimer=null,openingTimer=null;
 const settingsList=[{label:'Animation',type:'toggle'},{label:'Network & Wi-Fi',type:'wifi'},{label:'TV Inputs',type:'inputs'},{label:'Android System Settings',type:'settings'},{label:'Close Pokédex',type:'close'}];
 const el=id=>document.getElementById(id);
 function scale(){const s=Math.min(innerWidth/1920,innerHeight/1080);el('scaler').style.transform='translate('+((innerWidth-1920*s)/2)+'px,'+((innerHeight-1080*s)/2)+'px) scale('+s+')'}
@@ -41,11 +41,13 @@ function showSettings(){state='settings';settingsFocus=0;el('settings-overlay').
 function drawSettings(){const target=el('settings-options');target.replaceChildren();settingsList.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.className='setting-row'+(i===settingsFocus?' active':'');b.textContent=s.label;if(s.type==='toggle'){const label=document.createElement('small');label.textContent=animationEnabled?'ON':'OFF';b.append(label)}b.onclick=()=>{settingsFocus=i;selectSetting()};target.append(b)})}
 function selectSetting(){const type=settingsList[settingsFocus].type;if(type==='toggle'){animationEnabled=!animationEnabled;drawSettings();return}if(type==='close'){closeSettings();closeDex();return}if(native&&typeof CopperDex[type]==='function')CopperDex[type]()}
 function closeSettings(){el('settings-overlay').hidden=true;state='open';updateFocus()}
-function openDex(){if(state!=='closed')return;state='opening';el('device').classList.add('activating');setTimeout(()=>{el('device').classList.add('open');state='open';setTimeout(()=>el('device').classList.remove('activating'),700);updateFocus()},animationEnabled?250:0)}
-function closeDex(){if(state==='launching')return;state='closed';el('device').classList.remove('open','activating');document.body.classList.remove('launching');el('status').textContent='Press OK to open'}
+function openDex(){if(state!=='closed')return;state='opening';el('device').classList.add('activating');clearTimeout(openingTimer);openingTimer=setTimeout(()=>{el('device').classList.add('open');openingTimer=setTimeout(()=>{state='open';el('device').classList.remove('activating');updateFocus()},animationEnabled?1400:50)},animationEnabled?200:0)}
+function closeDex(){if(state==='launching')return;clearTimeout(openingTimer);state='closed';el('device').classList.remove('open','activating');document.body.classList.remove('launching');el('status').textContent='Press OK to open'}
 function openSystem(id){if(id==='settings'){showSettings();return}if(native&&typeof CopperDex[id]==='function')CopperDex[id]()}
-function launch(){if(state!=='open')return;if(area==='buttons'){openSystem(['settings','wifi','inputs'][buttonIndex]);return}const a=apps[focused];if(!a)return;if(!native||!a.pkg){el('status').textContent='Preview only — install on Android TV to launch apps';return}state='launching';document.body.classList.add('launching');el('device').classList.add('activating');clearTimeout(launchTimer);launchTimer=setTimeout(()=>{CopperDex.open(a.pkg);setTimeout(()=>{document.body.classList.remove('launching');el('device').classList.remove('activating');state='open'},900)},animationEnabled?900:0)}
+function launch(){if(state!=='open')return;if(area==='buttons'){openSystem(['settings','wifi','inputs'][buttonIndex]);return}const a=apps[focused];if(!a)return;if(!native||!a.pkg){el('status').textContent='Preview only — install on Android TV to launch apps';return}state='launching';document.body.classList.add('launching');el('device').classList.add('activating');clearTimeout(launchTimer);launchTimer=setTimeout(()=>{CopperDex.open(a.pkg);launchTimer=setTimeout(()=>{resetLaunch()},1300)},animationEnabled?950:0)}
 
+function resetLaunch(){clearTimeout(launchTimer);document.body.classList.remove('launching');el('device').classList.remove('activating');if(state==='launching')state='open';updateFocus()}
+window.copperResume=resetLaunch;
 function key(k){
  if(state==='closed'){if(k==='ok')openDex();return}
  if(state==='opening'||state==='launching')return;
@@ -76,4 +78,5 @@ window.copperKey=key;window.copperBack=()=>key('back');
 document.addEventListener('keydown',e=>{const k={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down',Enter:'ok',' ':'ok',Escape:'back',Backspace:'back'}[e.key];if(k){e.preventDefault();key(k)}});
 document.querySelectorAll('.system').forEach((b,i)=>b.addEventListener('click',()=>{area='buttons';buttonIndex=i;if(state==='closed')openDex();else if(state==='open')launch();updateFocus()}));
 el('replay').addEventListener('click',()=>{if(state==='settings')closeSettings();closeDex();setTimeout(openDex,450)});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state==='launching')resetLaunch()});
 addEventListener('resize',scale);scale();clock();setInterval(clock,30000);load();closeDex();
