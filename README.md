@@ -2,6 +2,9 @@
 
 Target: TCL V6C Google TV 55-inch. Native Java Android host with a local HTML/CSS/JS UI.
 
+## Approved visual direction
+See [docs/VISUAL-DIRECTION-V2.md](docs/VISUAL-DIRECTION-V2.md) for the Product Photography redesign brief and acceptance criteria. This is the **approved target**, not the current APK appearance. The existing v0.2.0 build is retained as the functional baseline.
+
 ## Implemented in source
 - Initial **closed Pokédex** with animated blue orb (breathing + scan sweep) and premium molded-shell effects.
 - First **OK** opens the Pokédex; **Back** closes it.
@@ -12,7 +15,7 @@ Target: TCL V6C Google TV 55-inch. Native Java Android host with a local HTML/CS
 - Reduced-motion handling for CSS effects.
 
 ## Not yet verified
-No APK has been built or tested on actual TCL hardware. CSS 3D graphics on Android WebView, launcher behavior, transitions, package visibility, input intents and performance need hardware validation. The themed Settings overlay is an application-level hub: Android's own Settings, permission prompts, and firmware UI cannot be replaced by a regular third-party app.
+A debug APK has been built successfully in GitHub Actions run 39292265310, but has **not** been tested on actual TCL hardware. CSS 3D graphics on Android WebView, launcher behavior, transitions, package visibility, input intents and performance need hardware validation. The themed Settings overlay is an application-level hub: Android's own Settings, permission prompts, and firmware UI cannot be replaced by a regular third-party app.
 
 ## Build
 Open repository in Android Studio, install JDK 17 and Android SDK 34, use Gradle 8.7, and build `app` debug APK. A Gradle wrapper is not included yet. The debug build should be installed as a normal app first (do **not** disable stock Home). See actual device-specific pairing and firmware restrictions before assigning as HOME.
