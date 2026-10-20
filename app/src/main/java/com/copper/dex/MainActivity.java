@@ -10,6 +10,8 @@ import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
+import android.media.tv.TvContract;
+import android.net.Uri;
 import android.provider.Settings;
 import android.util.Base64;
 import android.webkit.JavascriptInterface;
@@ -81,7 +83,43 @@ public class MainActivity extends Activity {
     }catch(Exception ignored){}
    });
   }
-  @JavascriptInterface public void settings(){runOnUiThread(()->startActivity(new Intent(Settings.ACTION_SETTINGS)));}
+  @JavascriptInterface public String banner(String pkg){
+   try{
+    PackageManager pm=getPackageManager();
+    Drawable d=null;
+    Intent launch=pm.getLeanbackLaunchIntentForPackage(pkg);
+    if(launch!=null) d=pm.getActivityBanner(launch);
+    if(d==null) d=pm.getApplicationBanner(pkg);
+    if(d==null) return "";
+    Bitmap bitmap=Bitmap.createBitmap(320,180,Bitmap.Config.ARGB_8888);
+    Canvas canvas=new Canvas(bitmap); d.setBounds(0,0,320,180); d.draw(canvas);
+    ByteArrayOutputStream stream=new ByteArrayOutputStream(); bitmap.compress(Bitmap.CompressFormat.PNG,90,stream);
+    return "data:image/png;base64,"+Base64.encodeToString(stream.toByteArray(),Base64.NO_WRAP);
+   }catch(Exception e){ return ""; }
+  }
+  @JavascriptInterface public void tv(){runOnUiThread(()->{
+   PackageManager pm=getPackageManager();
+   try{
+    Intent live=new Intent(Intent.ACTION_VIEW,TvContract.Channels.CONTENT_URI);
+    if(live.resolveActivity(pm)!=null){ startActivity(live); return; }
+   }catch(Exception ignored){}
+   for(String pkg:new String[]{"com.google.android.tv","com.tcl.tv","com.tcl.livetv"}){
+    try{
+     Intent in=pm.getLeanbackLaunchIntentForPackage(pkg);
+     if(in==null)in=pm.getLaunchIntentForPackage(pkg);
+     if(in!=null){ startActivity(in); return; }
+    }catch(Exception ignored){}
+   }
+   try{ startActivity(new Intent("android.settings.TV_INPUT_SETTINGS")); }
+   catch(Exception ignored){ startActivity(new Intent(Settings.ACTION_SETTINGS)); }
+  });}
+  @JavascriptInterface public void voice(){runOnUiThread(()->{
+   try{ startActivity(new Intent(Intent.ACTION_VOICE_COMMAND).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); }
+   catch(Exception first){
+    try{ startActivity(new Intent(Intent.ACTION_ASSIST).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); }catch(Exception ignored){}
+   }
+  });}
+ @JavascriptInterface public void settings(){runOnUiThread(()->startActivity(new Intent(Settings.ACTION_SETTINGS)));}
   @JavascriptInterface public void wifi(){runOnUiThread(()->startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)));}
   @JavascriptInterface public void inputs(){runOnUiThread(()->{
    try{ startActivity(new Intent("android.settings.TV_INPUT_SETTINGS")); }
