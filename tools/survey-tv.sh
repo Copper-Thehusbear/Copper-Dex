@@ -73,6 +73,14 @@ run tv-provider-permissions sh -c 'dumpsys package com.android.providers.tv | gr
 run watch-next-query content query --uri content://android.media.tv/watch_next_program
 run channels-query content query --uri content://android.media.tv/channel
 
+# 6b. Home-handover risks (read-only checks; nothing is disabled)
+run wifi-network-owner sh -c 'dumpsys wifi | grep -o "cname=[^ ]*" | sort | uniq -c'
+run wifi-saved-networks sh -c 'dumpsys wifi | grep -i -E "SSID|creatorName|creatorUid" | head -40'
+run home-handlers-detail sh -c 'dumpsys package | grep -B2 -A12 "android.intent.category.HOME" | head -160'
+run home-candidates sh -c 'for p in com.google.android.apps.tv.launcherx com.google.android.tvlauncher com.google.android.leanbacklauncher com.google.android.tungsten.setupwraith com.tcl.tv com.tcl.suspension com.google.android.tv.remote.service; do printf "%s: " "$p"; pm list packages "$p" | grep -q "package:$p$" && echo present || echo absent; done'
+run adb-security sh -c 'getprop ro.adb.secure; getprop persist.adb.tcp.port; getprop service.adb.tcp.port; netstat -ltn 2>/dev/null | grep -E ":5555|:5037" || true'
+run screensaver sh -c 'settings get secure screensaver_components; settings get secure screensaver_enabled'
+
 # 7. Recently used apps (needs Usage Access for an app; shell side only)
 run recent-tasks sh -c 'dumpsys activity recents | head -120'
 run usage-stats dumpsys usagestats
