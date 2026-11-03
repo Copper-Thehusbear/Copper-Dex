@@ -699,8 +699,9 @@
     for (var i = 0; i < 6; i++) {
       if (O.keys === '2') {   /* render-only: coloured jelly caps seated in black rims, straight on the red shell */
         var capCol = [0xffc21a, 0x22c55e, 0x3b82f6, 0x14c8d4, 0xa855f7, 0xef4444][i];
-        var rim = slab(roundedPoly(rectPts(0.5, 0.5, xs[i], -1.5), 0.16), 0.03, 0.015, mGasket); rim.position.z = zF + 0.0; g.add(rim);
-        var cap = slab(roundedPoly(rectPts(0.4, 0.4, xs[i], -1.5), 0.13), 0.075, 0.032, new StdMat({ color: C(capCol), roughness: 0.28, metalness: 0.02 })); cap.position.z = zF + 0.03; g.add(cap);
+        var rim = slab(roundedPoly(rectPts(0.45, 0.45, xs[i], -1.5), 0.15), 0.03, 0.015, mGasket); rim.position.z = zF + 0.0; g.add(rim);
+        var capMat = O.cap === 'black' ? mBlack : O.cap === 'cream' ? new StdMat({ color: C(0xf0e8d4), roughness: 0.4, metalness: 0 }) : new StdMat({ color: C(capCol), roughness: 0.28, metalness: 0.02 });
+        var cap = slab(roundedPoly(rectPts(0.4, 0.4, xs[i], -1.5), 0.13), 0.075, 0.032, capMat); cap.position.z = zF + 0.03; g.add(cap);
       } else if (O.keys === '1') {   /* render-only: raised keys like the D-pad, for the native launcher's body image */
         var keyMesh = slab(roundedPoly(rectPts(0.4, 0.4, xs[i], -1.5), 0.085), 0.07, 0.03, mBlack); keyMesh.position.z = zF + 0.035; g.add(keyMesh);
       } else {
