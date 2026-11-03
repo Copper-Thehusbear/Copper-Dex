@@ -919,7 +919,7 @@
     if (O.nodegrade !== '1') watchPerf(dt);
     requestAnimationFrame(frame);
   }
-  try { renderer.compile(scene, camera); } catch (e) {}
+  if (O.compile === '1') { try { renderer.compile(scene, camera); } catch (e) {} }   /* off by default: it crashed this TV's driver at startup */
   if (tier) msg('Graphics mode ' + tier, 4000);
   requestAnimationFrame(frame);
 
