@@ -20,7 +20,6 @@ public class MainActivity extends Activity {
  private AppRepo repo;
  private ArtLoader loader;
  private ShellView shell;
- private LensView lens;
  private HeroView hero;
  private ListPanelView list;
  private KeysView keys;
@@ -58,8 +57,6 @@ public class MainActivity extends Activity {
   keys = new KeysView(this);
   standby = new StandbyView(this);
   stage.addView(shell);
-  lens = new LensView(this);
-  stage.addView(lens);
   stage.addView(new LedView(this));
   stage.addView(hero);
   stage.addView(new ClockView(this));
@@ -88,7 +85,6 @@ public class MainActivity extends Activity {
   super.onResume();
   immersive();
   if (resumedOnce && repo.load()) showTab(tab);
-  lens.reload();
   resumedOnce = true;
   fade.animate().alpha(0f).setDuration(220).start();
  }

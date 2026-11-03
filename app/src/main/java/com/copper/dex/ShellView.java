@@ -25,6 +25,10 @@ final class ShellView extends DView {
  private final Paint ballFill = new Paint(Paint.ANTI_ALIAS_FLAG);
  private final Paint ballLine = Gfx.fill(0xFF181418);
  private final RectF box = new RectF();
+ private final android.graphics.Path path = new android.graphics.Path();
+ private final Paint glyphLine = Gfx.stroke(0xFFE9EFF4, 3f);
+ private final Paint glyphGlow = Gfx.stroke(Design.alpha(0xFFBEE6FF, 0.35f), 6f);
+ private final Paint glyphText = Gfx.text(Design.semi, 24, 0xFFE9EFF4, 0.02f);
  private final Rect all = new Rect(0, 0, Design.W, Design.H);
 
  ShellView(Context c) {
@@ -37,6 +41,7 @@ final class ShellView extends DView {
    in.close();
   } catch (Exception ignored) {
   }
+  glyphText.setTextAlign(Paint.Align.CENTER);
   word.setShadowLayer(8, 0, 0, Design.alpha(0xFFFFFFFF, 0.25f));
   wordDex.setShadowLayer(10, 0, 0, Design.alpha(Design.CYAN, 0.6f));
  }
@@ -45,6 +50,7 @@ final class ShellView extends DView {
   c.drawColor(Color.BLACK);
   if (shell != null) c.drawBitmap(shell, null, all, bmp);
   drawPlate(c);
+  drawKeyGlyphs(c);
  }
 
  /** The logo on the name plate: a ball mark, "COPPER DEX" and a small tagline. */
@@ -58,10 +64,40 @@ final class ShellView extends DView {
   float cx = n.left + 38, cy = n.centerY();
   drawBall(c, cx, cy, 21);
   float tx = n.left + 72;
-  c.drawText("COPPER", tx, n.top + 38, word);
+  float base = n.centerY() + 11;
+  c.drawText("COPPER", tx, base, word);
   float w = word.measureText("COPPER ");
-  c.drawText("DEX", tx + w, n.top + 38, wordDex);
-  c.drawText("HOME FOR YOUR TV", tx + 2, n.top + 58, tag);
+  c.drawText("DEX", tx + w, base, wordDex);
+ }
+
+ /** Marks on the six decorative keys at the lower left: four arrows, OK and back. */
+ private void drawKeyGlyphs(Canvas c) {
+  float[] xs = {174, 298, 421, 545, 668, 792};
+  float cy = 963;
+  for (int i = 0; i < 6; i++) {
+   for (int pass = 0; pass < 2; pass++) {
+    Paint p = pass == 0 ? glyphGlow : glyphLine;
+    float x = xs[i];
+    path.reset();
+    switch (i) {
+     case 0: path.moveTo(x + 7, cy - 12); path.lineTo(x - 10, cy); path.lineTo(x + 7, cy + 12); break;
+     case 1: path.moveTo(x - 12, cy + 7); path.lineTo(x, cy - 10); path.lineTo(x + 12, cy + 7); break;
+     case 2: path.moveTo(x - 12, cy - 7); path.lineTo(x, cy + 10); path.lineTo(x + 12, cy - 7); break;
+     case 3: path.moveTo(x - 7, cy - 12); path.lineTo(x + 10, cy); path.lineTo(x - 7, cy + 12); break;
+     case 4: break;
+     default:
+      box.set(x - 11, cy - 10, x + 11, cy + 12);
+      path.addArc(box, -40, -250);
+      path.moveTo(x + 8, cy - 14); path.lineTo(x + 9, cy - 5); path.lineTo(x + 1, cy - 8);
+      break;
+    }
+    if (i == 4) {
+     if (pass == 1) c.drawText("OK", x, cy + 8, glyphText);
+    } else {
+     c.drawPath(path, p);
+    }
+   }
+  }
  }
 
  private void drawBall(Canvas c, float cx, float cy, float r) {

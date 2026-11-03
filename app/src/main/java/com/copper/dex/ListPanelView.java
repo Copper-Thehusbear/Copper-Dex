@@ -41,8 +41,8 @@ final class ListPanelView extends DView {
  private final Paint num = Gfx.text(Design.light, 18, 0, 0.1f);
  private final Paint name = Gfx.text(Design.light, 30, 0, -0.01f);
  private final Paint cat = Gfx.text(Design.medium, 12, 0, 0.28f);
- private final Paint tabP = Gfx.text(Design.semi, 19, 0, 0.1f);
- private final Paint badge = Gfx.text(Design.semi, 14, 0, 0.04f);
+ private final Paint tabP = Gfx.text(Design.semi, 23, 0, 0.05f);
+ private final Paint badge = Gfx.text(Design.semi, 15, 0, 0.04f);
  private final Paint idxBig = Gfx.text(Design.light, 32, 0xFFE9F6FF, 0f);
  private final Paint idxSmall = Gfx.text(Design.medium, 16, Design.GRAY, 0.1f);
  private final Paint letter = Gfx.text(Design.medium, 14, 0xFF5A7085, 0f);
@@ -144,15 +144,15 @@ final class ListPanelView extends DView {
    badge.setColor(on ? Design.CYAN : 0xFFB5C6D4);
    float bw = badge.measureText(cn) + 14;
    float cx0 = x + 12;
-   c.drawText(TABS[i], cx0, 50, tabP);
+   c.drawText(TABS[i], cx0, 53, tabP);
    fill.setColor(on ? Design.alpha(Design.CYAN, 0.20f) : 0x1AFFFFFF);
-   r.set(cx0 + tw + 8, 32, cx0 + tw + 8 + bw, 56);
+   r.set(cx0 + tw + 8, 33, cx0 + tw + 8 + bw, 59);
    c.drawRoundRect(r, 9, 9, fill);
-   c.drawText(cn, r.left + 7, 50, badge);
+   c.drawText(cn, r.left + 7, 53, badge);
    float end = r.right + 12;
    if (on) {
     fill.setColor(Design.CYAN);
-    c.drawRect(x, 63, end, 65.5f, fill);
+    c.drawRect(x, 66, end, 68.5f, fill);
    }
    x = end + 8;
   }

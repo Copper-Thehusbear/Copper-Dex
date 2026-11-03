@@ -651,22 +651,19 @@
     var cd = polyMesh(q, mScreenC); cd.position.z = zF + 0.1; g.add(cd);
     var cgl = polyMesh(q, mGlass); cgl.position.z = zF + 0.105; g.add(cgl);
     g.add(ball(0.035, mLedR, -0.12, 0.99, zF + 0.1)); g.add(ball(0.035, mLedR, 0.12, 0.99, zF + 0.1));
-    g.add(ring(0.19, 0.025, mMetal, -0.95, -1.0, zF + 0.1));
-    g.add(disc(0.15, 0.06, mPill, -0.95, -1.0, zF + 0.1));
+    g.add(disc(0.215, 0.05, mGasket, -0.95, -1.0, zF + 0.095));
+    var domeBtn = new THREE.Mesh(new THREE.SphereGeometry(0.165, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2), mPill);
+    domeBtn.rotation.x = Math.PI / 2; domeBtn.scale.y = 0.5; domeBtn.position.set(-0.95, -1.0, zF + 0.12); g.add(domeBtn);
     for (var i = 0; i < 3; i++) {
       var s = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.03, 0.03), mGasket);
       s.position.set(1.15, -0.9 - i * 0.1, zF + 0.1); g.add(s);
     }
-    /* control cluster, kept inside the body with an even margin */
-    g.add(ring(0.17, 0.022, mGasket, 1.15, -1.7, zF + 0.01));
-    g.add(disc(0.14, 0.07, mBlack, 1.15, -1.7, zF + 0.03));
-    var pillR = slab(roundedPoly(rectPts(0.36, 0.07, -0.22, -1.52), 0.035), 0.03, 0.02, mPill); pillR.position.z = zF + 0.02; g.add(pillR);
-    var pillT = slab(roundedPoly(rectPts(0.36, 0.07, 0.22, -1.52), 0.035), 0.03, 0.02, mTeal); pillT.position.z = zF + 0.02; g.add(pillT);
-    var bar = slab(roundedPoly(rectPts(1.0, 0.22, 0, -1.78), 0.08), 0.04, 0.02, mGreen); bar.position.z = zF + 0.03; g.add(bar);
-    var a = 0.09, l = 0.26, ox = -1.2, oy = -1.7;
-    var cross = [[a, -l], [a, -a], [l, -a], [l, a], [a, a], [a, l], [-a, l], [-a, a], [-l, a], [-l, -a], [-a, -a], [-a, -l]];
-    var dpad = slab(roundedPoly(shift(cross, ox, oy), 0.04), 0.05, 0.025, mBlack); dpad.position.z = zF + 0.04; g.add(dpad);
-    g.add(disc(0.045, 0.03, mGasket, ox, oy, zF + 0.09));
+    /* control keys, same style as the keys on the right-hand half */
+    var kx = [-1.2, -0.72, -0.24, 0.24, 0.72, 1.2];
+    for (var kq = 0; kq < kx.length; kq++) {
+      var kr = slab(roundedPoly(rectPts(0.39, 0.39, kx[kq], -1.64), 0.13), 0.03, 0.015, mGasket); kr.position.z = zF + 0.0; g.add(kr);
+      var kc = slab(roundedPoly(rectPts(0.345, 0.345, kx[kq], -1.64), 0.115), 0.07, 0.03, mBlack); kc.position.z = zF + 0.03; g.add(kc);
+    }
     return g;
   }
   function buildLid() {
