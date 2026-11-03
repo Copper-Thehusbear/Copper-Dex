@@ -695,8 +695,12 @@
     panel.position.z = zF + 0.02; g.add(panel);
     var xs = [-1.25, -0.75, -0.25, 0.25, 0.75, 1.25], rings = [];
     for (var i = 0; i < 6; i++) {
+      if (O.keys === '1') {   /* render-only: raised keys like the D-pad, for the native launcher's body image */
+        var keyMesh = slab(roundedPoly(rectPts(0.4, 0.4, xs[i], -1.5), 0.085), 0.07, 0.03, mBlack); keyMesh.position.z = zF + 0.035; g.add(keyMesh);
+      } else {
       g.add(ring(0.165, 0.016, mMetal, xs[i], -1.5, zF + 0.07));
       g.add(disc(0.15, 0.07, mBlack, xs[i], -1.5, zF + 0.065));
+      }
       var pl = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.52), btnMats[i]);
       pl.position.set(xs[i], -1.579, zF + 0.108); g.add(pl);
       var fr = ring(0.21, 0.022, mFocus, xs[i], -1.5, zF + 0.08);
