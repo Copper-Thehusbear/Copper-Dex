@@ -27,7 +27,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     m.N.visible = false; m.SL.visible = false; m.SR.visible = false; m.glass.visible = false; m.btn.forEach(b => { b.visible = false; });
     d.scene.updateMatrixWorld(true);
     const wp = new T.Vector3(), find = {};
-    const mats = { left: m.L, right: m.R, clock: m.C, name: m.N };
+    const mats = { left: m.L, right: m.R, clock: m.C, name: m.N, status: m.S };
     d.D.pivot.traverse(o => {
       if (!o.isMesh) return;
       for (const k in mats) if (o.material === mats[k]) {

@@ -448,6 +448,7 @@
   var mScreenR = new THREE.MeshBasicMaterial({ map: tR, toneMapped: false });
   var mScreenC = new THREE.MeshBasicMaterial({ map: tC, toneMapped: false });
   var mScreenN = new THREE.MeshBasicMaterial({ map: tN, transparent: true, toneMapped: false, depthWrite: false });
+  var mScreenS = new THREE.MeshBasicMaterial({ color: C(0x04070d), toneMapped: false });
   var mSign = new StdMat({ color: C(0xe9edf2), metalness: 1, roughness: 0.2, envMapIntensity: 2.0 });
   function makeSheen(w, h) {
     var c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -658,12 +659,10 @@
       var s = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.03, 0.03), mGasket);
       s.position.set(1.15, -0.9 - i * 0.1, zF + 0.1); g.add(s);
     }
-    /* control keys, same style as the keys on the right-hand half */
-    var kx = [-1.2, -0.72, -0.24, 0.24, 0.72, 1.2];
-    for (var kq = 0; kq < kx.length; kq++) {
-      var kr = slab(roundedPoly(rectPts(0.39, 0.39, kx[kq], -1.64), 0.13), 0.03, 0.015, mGasket); kr.position.z = zF + 0.0; g.add(kr);
-      var kc = slab(roundedPoly(rectPts(0.345, 0.345, kx[kq], -1.64), 0.115), 0.07, 0.03, mBlack); kc.position.z = zF + 0.03; g.add(kc);
-    }
+    /* status display: a recessed bezel around a flat dark screen that the native app draws on */
+    var lcdBez = slab(roundedPoly(rectPts(2.36, 0.46, 0, -1.66), 0.14), 0.04, 0.02, mGasket); lcdBez.position.z = zF + 0.01; g.add(lcdBez);
+    var lcdFrame = slab(roundedPoly(rectPts(2.24, 0.34, 0, -1.66), 0.1), 0.02, 0.012, mBlack); lcdFrame.position.z = zF + 0.05; g.add(lcdFrame);
+    var lcd = new THREE.Mesh(new THREE.PlaneGeometry(2.16, 0.26), mScreenS); lcd.position.set(0, -1.66, zF + 0.085); g.add(lcd);
     return g;
   }
   function buildLid() {
@@ -942,7 +941,7 @@
   if (O.compile === '1') { try { renderer.compile(scene, camera); } catch (e) {} }   /* off by default: it crashed this TV's driver at startup */
   if (O.debug === '1') {   /* hook for tools/render-shell.js, which renders the device body for the native launcher */
     window.__dex = { THREE: THREE, scene: scene, camera: camera, renderer: renderer, D: D, setTarget: setTarget,
-      mats: { L: mScreenL, R: mScreenR, C: mScreenC, N: mScreenN, SL: mSheenL, SR: mSheenR, glass: mGlass, btn: btnMats }, state: function () { return state; } };
+      mats: { L: mScreenL, R: mScreenR, C: mScreenC, N: mScreenN, S: mScreenS, SL: mSheenL, SR: mSheenR, glass: mGlass, btn: btnMats }, state: function () { return state; } };
   }
   if (tier) msg('Graphics mode ' + tier, 4000);
   requestAnimationFrame(frame);

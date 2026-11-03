@@ -60,6 +60,7 @@ public class MainActivity extends Activity {
   stage.addView(new LedView(this));
   stage.addView(hero);
   stage.addView(new ClockView(this));
+  stage.addView(new StatusView(this));
   stage.addView(list);
   stage.addView(keys);
   stage.addView(standby);

@@ -18,6 +18,7 @@ final class Design {
  static final int KEY_Y = 928, KEY_SIZE = 100;
  static final Rect KEYS = new Rect(1040, 860, 1850, 1050);
  static final Rect LEDS = new Rect(0, 0, 560, 270);
+ static final Rect STATUS = new Rect(198, 938, 760, 1006);
 
  static final int BG = 0xFF040812, PANEL = 0xFF050810, CYAN = 0xFF5CE1FF, GRAY = 0xFF7E93A6, DIM = 0xFF5F7488;
 

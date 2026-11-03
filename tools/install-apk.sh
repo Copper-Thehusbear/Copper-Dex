@@ -22,6 +22,9 @@ fi
 adb connect "$TARGET"
 adb -s "$TARGET" get-state >/dev/null || { echo "TV not reachable. Approve the debugging prompt on the TV and retry."; exit 1; }
 adb -s "$TARGET" install -r "$APK"
+# let the status display read the Wi-Fi name and the TV's notifications (both reversible in Settings)
+adb -s "$TARGET" shell pm grant com.copper.dex android.permission.ACCESS_FINE_LOCATION >/dev/null 2>&1 || true
+adb -s "$TARGET" shell cmd notification allow_listener com.copper.dex/com.copper.dex.NotifService >/dev/null 2>&1 || true
 adb -s "$TARGET" shell am start -n com.copper.dex/.MainActivity
 echo "Installed and launched. Uninstall with: adb -s $TARGET uninstall com.copper.dex"
 echo "Close network ADB when finished: adb disconnect $TARGET (and turn debugging off on the TV)."
