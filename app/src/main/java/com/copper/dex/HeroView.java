@@ -77,19 +77,19 @@ final class HeroView extends DView {
   bg.setShader(new RadialGradient(cx, area.top + h * 0.38f, w * 0.72f, new int[]{hi, acc, lo}, new float[]{0f, 0.42f, 1f}, Shader.TileMode.CLAMP));
   bg.setAlpha(Math.round(255 * alpha));
   c.drawRect(area, bg);
-  float cy = area.top + h * 0.40f;
+  shade.setAlpha(Math.round(255 * alpha));
+  c.drawRect(area, shade);
+  float cy = area.top + 64 + 107;        // art sits between the caption and the title
   if (e.banner != null) {
-   tmp.set(cx - 235, cy - 132, cx + 235, cy + 132);
-   Gfx.bitmapCover(c, e.banner, tmp, 22, alpha, art);
+   tmp.set(cx - 190, cy - 107, cx + 190, cy + 107);
+   Gfx.bitmapCover(c, e.banner, tmp, 20, alpha, art);
   } else if (e.icon != null) {
-   tmp.set(cx - 80, cy - 100, cx + 80, cy + 60);
+   tmp.set(cx - 85, cy - 100, cx + 85, cy + 100);
    Gfx.bitmapFit(c, e.icon, tmp, alpha, art);
   } else if (e.glyph != null) {
    glyph.setAlpha(Math.round(255 * alpha));
    c.drawText(e.glyph, cx, cy + 40, glyph);
   }
-  shade.setAlpha(Math.round(255 * alpha));
-  c.drawRect(area, shade);
   sheen.setAlpha(Math.round(255 * alpha));
   c.drawRect(area, sheen);
   cap.setAlpha(Math.round(191 * alpha));
