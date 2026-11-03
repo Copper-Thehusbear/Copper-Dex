@@ -69,7 +69,7 @@ final class HeroView extends DView {
   float w = area.width(), h = area.height(), cx = area.centerX();
   if (e == null) {
    cap.setAlpha(Math.round(255 * alpha));
-   c.drawText("NO APPS", area.left + 38, area.top + 44, cap);
+   c.drawText("NOTHING SELECTED", area.left + 38, area.top + 44, cap);
    return;
   }
   int acc = e.accent;

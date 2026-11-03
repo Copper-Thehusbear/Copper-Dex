@@ -20,7 +20,7 @@ import java.util.List;
 final class ListPanelView extends DView {
  interface Favs { boolean isFav(AppEntry e); }
 
- private static final String[] TABS = {"ALL APPS", "FAVOURITES", "INPUTS"};
+ private static final String[] TABS = {"FAVOURITES", "INPUTS", "ALL APPS"};
  // wheel layout by offset from the focused row, -4..+4: top, height, alpha, indent (panel coordinates)
  private static final float[] TOP = {84, 128, 184, 246, 326, 454, 530, 594, 650};
  private static final float[] HGT = {40, 46, 54, 68, 118, 68, 56, 48, 40};
@@ -66,7 +66,7 @@ final class ListPanelView extends DView {
  void setFavs(Favs f) { favs = f; }
 
  void setCounts(int all, int fav, int inputs) {
-  counts[0] = all; counts[1] = fav; counts[2] = inputs;
+  counts[0] = fav; counts[1] = inputs; counts[2] = all;
   invalidate();
  }
 
@@ -179,7 +179,7 @@ final class ListPanelView extends DView {
 
  private void drawRows(Canvas c) {
   if (items.isEmpty()) {
-   String msg = tab == 1 ? "Hold OK on an app to add it to favourites" : "Nothing here";
+   String msg = tab == 0 ? "Hold OK on an app (in ALL APPS) to add it here" : "Nothing here";
    c.drawText(msg, pw / 2f, ph / 2f, hintP);
    return;
   }

@@ -26,7 +26,9 @@ public class MainActivity extends Activity {
  private StandbyView standby;
  private View fade;
 
- private int tab = 0, zone = LIST, keyFocus = 2;
+ // tabs: 0 favourites, 1 inputs, 2 all apps
+ private static final int T_FAV = 0, T_INPUTS = 1, T_ALL = 2;
+ private int tab = T_FAV, zone = LIST, keyFocus = 2;
  private final int[] selTab = new int[3];
  private List<AppEntry> current = new ArrayList<>();
  private boolean resumedOnce;
@@ -70,7 +72,7 @@ public class MainActivity extends Activity {
   list.setFavs(new ListPanelView.Favs() {
    @Override public boolean isFav(AppEntry e) { return repo.isFav(e); }
   });
-  showTab(0);
+  showTab(T_FAV);
  }
 
  private void immersive() {
@@ -91,7 +93,7 @@ public class MainActivity extends Activity {
   super.onNewIntent(intent);          // Home pressed while we are showing
   if (standby.isShown2()) standby.setShown(false);
   setZone(LIST);
-  if (tab != 0) showTab(0);
+  if (tab != T_FAV) showTab(T_FAV);
   select(0);
  }
 
@@ -99,7 +101,7 @@ public class MainActivity extends Activity {
 
  private void showTab(int t) {
   tab = t;
-  current = t == 0 ? repo.apps : t == 1 ? repo.favourites() : repo.inputs;
+  current = t == T_FAV ? repo.favourites() : t == T_INPUTS ? repo.inputs : repo.apps;
   selTab[t] = Math.max(0, Math.min(selTab[t], Math.max(0, current.size() - 1)));
   list.setCounts(repo.apps.size(), repo.favourites().size(), repo.inputs.size());
   list.setItems(current, t, selTab[t]);
@@ -171,7 +173,7 @@ public class MainActivity extends Activity {
     if (en.type == AppEntry.APP) {
      repo.toggleFav(en);
      list.setCounts(repo.apps.size(), repo.favourites().size(), repo.inputs.size());
-     if (tab == 1) showTab(1); else list.invalidate();
+     if (tab == T_FAV) showTab(T_FAV); else list.invalidate();
      Toast.makeText(this, repo.isFav(en) ? en.label + " added to favourites" : en.label + " removed from favourites", Toast.LENGTH_SHORT).show();
     }
    }
@@ -199,7 +201,7 @@ public class MainActivity extends Activity {
  private void onBack() {
   if (standby.isShown2()) { standby.setShown(false); return; }
   if (zone == KEYS) { setZone(LIST); return; }
-  if (tab != 0) showTab(0);
+  if (tab != T_FAV) showTab(T_FAV);
  }
 
  private void activate() {
@@ -212,7 +214,7 @@ public class MainActivity extends Activity {
   switch (i) {
    case 0: go(new Intent(Settings.ACTION_SETTINGS)); break;
    case 1: go(new Intent(Settings.ACTION_WIFI_SETTINGS)); break;
-   case 2: setZone(LIST); showTab(2); break;
+   case 2: setZone(LIST); showTab(T_INPUTS); break;
    case 3:
     for (AppEntry e : repo.inputs) if (e.pkg.equals("live")) { launch(e); return; }
     go(new Intent("android.settings.TV_INPUT_SETTINGS"));
