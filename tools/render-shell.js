@@ -21,6 +21,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   await page.waitForTimeout(3000);
   const rects = await page.evaluate(() => {
     const d = window.__dex, T = d.THREE, m = d.mats, cam = d.camera;
+    d.renderer.toneMappingExposure = 0.5;
     const dark = new T.Color(0x04070d);
     [m.L, m.R, m.C, m.N].forEach(x => { x.map = null; x.color = dark.clone(); x.transparent = false; x.needsUpdate = true; });
     m.N.visible = false; m.SL.visible = false; m.SR.visible = false; m.glass.visible = false; m.btn.forEach(b => { b.visible = false; });
@@ -39,6 +40,21 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
       }
     });
     const vw = innerWidth, vh = innerHeight, res = {};
+    const poly = [];
+    d.D.pivot.traverse(o => {
+      if (!o.isMesh || o.material !== m.C) return;
+      const pos = o.geometry.attributes.position, seen = {};
+      for (let i = 0; i < pos.count; i++) {
+        wp.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld).project(cam);
+        const px = Math.round((wp.x + 1) / 2 * vw), py = Math.round((1 - wp.y) / 2 * vh);
+        if (!seen[px + ',' + py]) { seen[px + ',' + py] = 1; poly.push([px, py]); }
+      }
+    });
+    if (poly.length) {
+      const cx = poly.reduce((a, p) => a + p[0], 0) / poly.length, cy = poly.reduce((a, p) => a + p[1], 0) / poly.length;
+      poly.sort((a, b) => Math.atan2(a[1] - cy, a[0] - cx) - Math.atan2(b[1] - cy, b[0] - cx));
+      res.clockPoly = poly;
+    }
     for (const k in find) {
       const r = find[k][0];
       res[k] = { x: Math.round((r.x0 + 1) / 2 * vw), y: Math.round((1 - r.y1) / 2 * vh), w: Math.round((r.x1 - r.x0) / 2 * vw), h: Math.round((r.y1 - r.y0) / 2 * vh) };
