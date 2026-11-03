@@ -42,7 +42,10 @@ final class Design {
  static float lerp(float a, float b, float t) { return a + (b - a) * t; }
 
  static int lerp(int a, int b, float t) {
-  return Color.argb(Math.round(lerp(Color.alpha(a), Color.alpha(b), t)), Math.round(lerp(Color.red(a), Color.red(b), t)),
-    Math.round(lerp(Color.green(a), Color.green(b), t)), Math.round(lerp(Color.blue(a), Color.blue(b), t)));
+  float x = Math.max(0f, Math.min(1f, t));
+  return Color.argb(mix(Color.alpha(a), Color.alpha(b), x), mix(Color.red(a), Color.red(b), x),
+    mix(Color.green(a), Color.green(b), x), mix(Color.blue(a), Color.blue(b), x));
  }
+
+ private static int mix(int a, int b, float t) { return Math.round(a + (b - a) * t); }
 }
