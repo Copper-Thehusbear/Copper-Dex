@@ -38,7 +38,7 @@
   try {
     var gl = renderer.getContext(), dbg = gl.getExtension('WEBGL_debug_renderer_info');
     var gpuName = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : '';
-    if (tier < 1 && O.tier === undefined && /powervr/i.test(gpuName)) tier = 1;
+    if (tier < 2 && O.tier === undefined && /powervr/i.test(gpuName)) tier = 2;
   } catch (e) {}
   tier = Math.max(0, Math.min(3, tier));
   function flag(name, byTier) { return O[name] !== undefined ? O[name] === '1' : byTier; }
@@ -54,8 +54,8 @@
     var metal = q.metalness || 0, rough = q.roughness === undefined ? 0.5 : q.roughness;
     delete q.metalness; delete q.roughness; delete q.envMapIntensity;
     if (matKind === 'phong') {
-      q.shininess = Math.max(8, Math.min(160, 2 / (rough * rough + 0.01)));
-      q.specular = new THREE.Color(0x222222).lerp(new THREE.Color(0x999999), metal);
+      q.shininess = Math.max(30, Math.min(130, 2 / (rough * rough + 0.01)));   /* glossy toy plastic */
+      q.specular = new THREE.Color(0x383838).lerp(new THREE.Color(0xbbbbbb), metal);
       return new THREE.MeshPhongMaterial(q);
     }
     delete q.emissive; delete q.emissiveIntensity;
@@ -116,7 +116,12 @@
   var rim = new THREE.DirectionalLight(0x9fc4ff, 0.35);
   rim.position.set(6, 4, -6);
   scene.add(rim);
-  scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x1a1f2b, 0.15));
+  var hemi = new THREE.HemisphereLight(0xcfe0ff, 0x1a1f2b, 0.15);
+  scene.add(hemi);
+  if (!useEnv) {      /* plastic look: no environment reflections, so light the shell directly */
+    key.intensity = 0.7; rim.intensity = 0.4; hemi.intensity = 0.5; hemi.groundColor.set(0x3a2a2a);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+  }
 
   /* ---------- materials ---------- */
   var baseRed = C(0xd2121c), baseRedDark = C(0x9e0d16);
@@ -721,10 +726,11 @@
   function pose(d, p) {
     d.flap.rotation.y = -Math.PI * (1 - p);
     d.root.position.x = HALF * (1 - p);
-    d.pivot.rotation.y = THREE.MathUtils.lerp(-0.3, 0.12, p);
+    d.pivot.rotation.y = THREE.MathUtils.lerp(-0.12, 0, p);
   }
   var D = buildDevice(false);
   var R = buildDevice(true);
+  scene.remove(R.pivot);                                              /* no floor reflection */
   if (!(document.fonts && document.fonts.load)) rebuildSign();
   setTimeout(function () { if (!signBuilt) rebuildSign(); }, 2500);
   function updateRings() {
@@ -759,6 +765,7 @@
   contact.rotation.x = -Math.PI / 2; contact.position.y = GY + 0.003; contact.renderOrder = 3; scene.add(contact);
   var ground = useShadow ? new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.ShadowMaterial({ opacity: 0.35 })) : new THREE.Group();
   ground.rotation.x = -Math.PI / 2; ground.position.y = GY + 0.004; ground.receiveShadow = true; ground.renderOrder = 4; scene.add(ground);
+  [floor, glow, contact, ground].forEach(function (o) { o.visible = false; });   /* no floor, glow or shadow: the device just fills the screen */
 
   /* ---------- state, animation ---------- */
   var state = 'closed';
@@ -781,7 +788,7 @@
     pFrom = p; pTo = v; pStart = performance.now();
     pDur = reduce ? 0.01 : (v ? 1.6 : 1.3);
     state = v ? 'opening' : 'closing';
-    if (v) burstStart = performance.now(); else closeStart = performance.now();
+    if (v) { burstStart = performance.now(); openFrames = 0; if (BRIDGE && BRIDGE.mark) { try { BRIDGE.mark('opening'); } catch (e) {} } } else closeStart = performance.now();
   }
   function startPrime() {
     state = 'priming'; primeStart = performance.now(); flareStart = primeStart; hint();
@@ -824,15 +831,15 @@
     renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
     var th = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-    distOpen = Math.max(2 * W * 1.13 / (th * camera.aspect), H * 1.18 / th);
-    distClosed = Math.max(W * 1.2 / (th * camera.aspect), H * 1.2 / th);
+    distOpen = Math.max(2 * W / (th * camera.aspect), H / th) + zF;       /* the open front face fills the screen edge to edge */
+    distClosed = Math.max(W * 1.1 / (th * camera.aspect), H * 1.08 / th) + zF;
     hint();
   }
   window.addEventListener('resize', resize);
   resize();
 
   var tmpV = new THREE.Vector3(), look = new THREE.Vector3(), launchPos = new THREE.Vector3(), launchLook = new THREE.Vector3(), wp = new THREE.Vector3(), dir = new THREE.Vector3();
-  var okFrames = 0, lastDraw = 0, capMs = O.fps !== undefined ? (parseFloat(O.fps) > 0 ? 1000 / parseFloat(O.fps) : 0) : (BRIDGE ? 1000 / 30 : 0);
+  var okFrames = 0, openFrames = 0, lastDraw = 0, capMs = O.fps !== undefined ? (parseFloat(O.fps) > 0 ? 1000 / parseFloat(O.fps) : 0) : (BRIDGE ? 1000 / 30 : 0);
   var statN = 0, statT = 0, statEl = null;
   if (O.show === '1') {
     statEl = document.createElement('div');
@@ -865,14 +872,13 @@
       } else if (state === 'closing') { state = 'closed'; hint(); }
     }
     pose(D, p); pose(R, p);
-    contact.scale.set(THREE.MathUtils.lerp(4.4, 9.4, p), 3, 1);
     var lk = Math.min(1, (now - launchStart) / 1000 / 0.9);
     launch = launchFrom + (launchTo - launchFrom) * ease(lk);
     fadeEl.style.opacity = String(Math.max(0, Math.min(1, (launch - 0.6) / 0.4)));
     px += (tpx - px) * 0.06; py += (tpy - py) * 0.06;
     var dist = THREE.MathUtils.lerp(distClosed, distOpen, p);
-    tmpV.set(px * 0.5, 0.45 + py * 0.3, dist);
-    look.set(0, -0.05, 0);
+    tmpV.set(0, 0, dist);
+    look.set(0, 0, 0);
     if (launch > 0.001) {
       D.pivot.updateMatrixWorld(true);
       D.left.userData.disp.getWorldPosition(wp);
@@ -909,9 +915,11 @@
     renderer.render(scene, camera);
     stats(now);
     if (okFrames < 90 && ++okFrames === 90 && BRIDGE && BRIDGE.bootOk) { try { BRIDGE.bootOk(); } catch (e) {} }
+    if (state === 'open' && openFrames < 60 && ++openFrames === 60 && BRIDGE && BRIDGE.mark) { try { BRIDGE.mark('openOk'); } catch (e) {} }
     if (O.nodegrade !== '1') watchPerf(dt);
     requestAnimationFrame(frame);
   }
+  try { renderer.compile(scene, camera); } catch (e) {}
   if (tier) msg('Graphics mode ' + tier, 4000);
   requestAnimationFrame(frame);
 

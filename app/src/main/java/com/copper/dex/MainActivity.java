@@ -63,7 +63,7 @@ public class MainActivity extends Activity {
    SharedPreferences sp=prefs(); int forced=getIntent().getIntExtra("tier",-1);
    int t=sp.getInt("tier",0);
    if(forced>=0&&!sp.getBoolean("forcedUsed",false)){ t=Math.min(MAX_TIER,forced); sp.edit().putInt("tier",t).putBoolean("forcedUsed",true).putBoolean("booting",true).commit(); return t; }
-   if(sp.getBoolean("booting",false)){ t=Math.min(MAX_TIER,t+1); sp.edit().putInt("tier",t).commit(); }
+   if(sp.getBoolean("booting",false)||sp.getBoolean("opening",false)){ t=Math.min(MAX_TIER,t+1); sp.edit().putInt("tier",t).putBoolean("opening",false).commit(); }
    sp.edit().putBoolean("booting",true).commit();
    return t;
   }
@@ -73,6 +73,8 @@ public class MainActivity extends Activity {
    if(o!=null){ if(o.equals("clear"))o=""; sp.edit().putString("opts",o).commit(); }
    return sp.getString("opts","");
   }
+  /* mark("opening") before the flap opens, mark("openOk") once it has rendered stably; a launch that dies in between raises the tier */
+  @JavascriptInterface public synchronized void mark(String what){ prefs().edit().putBoolean("opening","opening".equals(what)).commit(); }
   @JavascriptInterface public synchronized void bootOk(){ prefs().edit().putBoolean("booting",false).commit(); }
   @JavascriptInterface public synchronized int tierUp(){
    SharedPreferences sp=prefs(); int t=Math.min(MAX_TIER,sp.getInt("tier",0)+1);
