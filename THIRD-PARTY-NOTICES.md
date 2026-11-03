@@ -1,6 +1,7 @@
 # Third-party notices
 
-Bundled with the launcher (no network access is needed at runtime):
+- **Outfit** (`app/src/main/assets/fonts/Outfit-*.ttf`, static instances cut from the variable font) is licensed under the SIL Open Font License 1.1, Copyright 2021 The Outfit Project Authors. https://github.com/Outfitio/Outfit-Fonts
+- **Tools only (not shipped in the APK):** `tools/shell-scene/` contains **three.js r128** (`vendor/three.min.js`, MIT, Copyright (c) 2010-2021 three.js authors, https://github.com/mrdoob/three.js) and the **Chakra Petch** font (SIL OFL 1.1, Copyright 2018 The Chakra Petch Project Authors). They are used only to render the device body image `app/src/main/assets/shell.png`.
+- **tools/lists/tcl-g10.txt** is adapted from the community package list in **cleanyourtv** (`examples/tcl-g10-google-tv`), MIT License, Copyright (c) 2026 Gathin, https://github.com/Gathin23/cleanyourtv. The idea of handing Home to a custom launcher with `pm disable-user` and a rollback comes from the same project; `tools/set-home.sh` is written for this repository.
 
-- **three.js r128** (`app/src/main/assets/vendor/three.min.js`) is MIT licensed, Copyright (c) 2010-2021 three.js authors. https://github.com/mrdoob/three.js
-- **Chakra Petch** (latin subset, embedded as data URIs in `app/src/main/assets/index.html`) is licensed under the SIL Open Font License 1.1, Copyright 2018 The Chakra Petch Project Authors. https://github.com/m4rc1e/Chakra-Petch
+MIT License (cleanyourtv): Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.

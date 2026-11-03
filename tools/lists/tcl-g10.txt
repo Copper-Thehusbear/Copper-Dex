@@ -1,0 +1,35 @@
+# Apps to disable on a TCL Google TV with the G10 board (tested firmware STT2.230203.001, product G10_4K_GB_NF_32BIT).
+# Adapted from the community list in https://github.com/Gathin23/cleanyourtv (examples/tcl-g10-google-tv, MIT licence).
+# Disabled, never uninstalled: tools/debloat.sh <ip> --undo turns them back on.
+# Live TV (com.tcl.tv), inputs and the source panel are protected by the script and are never touched.
+
+# TCL promos, content pushed to the home screen, demo and store mode
+com.tcl.channelplus                    # TCL live FAST channels
+com.tcl.tv.tclhome_passive             # pushes TCL content to the home screen at boot
+com.tcl.partnercustomizer              # TCL tweaks to the Google TV home rows
+com.tcl.interactive                    # TCL background service
+com.tcl.exhibit                        # store demo mode
+com.tcl.esticker                       # store demo stickers
+
+# Manuals and repair guides, Google feedback and automatic partner installs
+com.tcl.ocean.instructions
+com.tcl.repairguide
+android.autoinstalls.config.google.gtvpai
+com.google.android.feedback
+
+# Optional: remove the leading "# " on a line to disable it too.
+# com.tcl.hotelmenu                    # hotel mode menu
+# com.tcl.gamebar                      # console game-mode overlay (keep if you use game mode)
+# com.tcl.ui_mediaCenter               # plays media from USB drives (keep if you use USB)
+# com.tcl.UpdatePeripheral             # TCL soundbar updates
+# com.tcl.usercenter                   # TCL account sign-in prompts
+# com.tcl.messagebox                   # TCL push messages
+# com.tcl.waterfall.overseas
+# com.tcl.magiconnectfree
+# com.tcl.smartalexa
+# com.tcl.airplay2                     # AirPlay (together with the next line)
+# com.realtek.airplay2
+# tv.samba.ssm.ui                      # Samba TV viewing-data (ACR) interface: privacy, safe to disable
+# com.google.android.marvin.talkback   # screen reader: keep if anyone needs it
+# com.google.android.apps.tv.dreamx    # ambient screensaver: also set another screensaver first
+# com.google.android.tv.remote.service # phone-app remote AND the remote's microphone button: keep unless you never use voice

@@ -18,20 +18,71 @@
     if (ms) msgTimer = setTimeout(function () { msgEl.textContent = ''; msgEl.style.display = 'none'; }, ms);
   }
   if (!window.THREE) { msg('Could not load three.js'); return; }
+  /* Tuning options, "key=value,key=value": from the native side (am start ... --es opts "pr=1,fps=30") or the page URL.
+     tier, mat (phys|std|phong|basic), cc, shadow, env (0/1), aa, pr (pixel ratio), fps (cap), nodegrade, show (fps overlay) */
+  var O = {};
+  try {
+    String((BRIDGE && BRIDGE.opts && BRIDGE.opts()) || location.search.replace(/^\?/, '').split('&').join(',')).split(',').forEach(function (kv) {
+      var a = kv.split('='); if (a[0].trim()) O[a[0].trim()] = a[1] === undefined ? '1' : a[1].trim();
+    });
+  } catch (e) {}
+  /* The TV's GPU runs out of memory (GL_OUT_OF_MEMORY, then the driver aborts), so the native app starts in a low-memory profile:
+     screen textures at half size, no mipmaps or anisotropy, no multisampling. lowmem=0 / tk=1 / aa=1 turn parts of it back off. */
+  var lowmem = O.lowmem !== undefined ? O.lowmem === '1' : !!BRIDGE;
+  var TK = O.tk ? parseFloat(O.tk) || 1 : (lowmem ? 0.5 : 1);
   var renderer;
-  try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); }
+  try { renderer = new THREE.WebGLRenderer({ antialias: O.aa !== undefined ? O.aa === '1' : !lowmem, alpha: true }); }
   catch (e) { msg('WebGL is not available on this device'); return; }
+
+  /* Some TV GPU drivers (PowerVR) crash while compiling the full physical shaders, which kills the whole app.
+     tier 0 = full look, 1 = no clearcoat or shadows, 2 = Phong without the environment map, 3 = unlit.
+     The native side raises the tier by itself after a crash (see MainActivity.bootTier). */
+  var tier = 0;
+  try { tier = O.tier !== undefined ? (parseInt(O.tier, 10) || 0) : (BRIDGE && BRIDGE.bootTier ? (BRIDGE.bootTier() | 0) : 0); } catch (e) { tier = 0; }
+  try {
+    var gl = renderer.getContext(), dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    var gpuName = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : '';
+    if (tier < 2 && O.tier === undefined && /powervr/i.test(gpuName)) tier = 2;
+  } catch (e) {}
+  tier = Math.max(0, Math.min(3, tier));
+  function flag(name, byTier) { return O[name] !== undefined ? O[name] === '1' : byTier; }
+  var useCC = flag('cc', tier === 0), useShadow = flag('shadow', tier === 0), useEnv = flag('env', tier < 2);
+  var matKind = O.mat || (tier === 0 ? 'phys' : tier === 1 ? 'std' : tier === 2 ? 'phong' : 'basic');
+  function makeMat(p, wantPhysical) {
+    var q = {}, k;
+    for (k in p) q[k] = p[k];
+    if (!useCC || matKind !== 'phys') { delete q.clearcoat; delete q.clearcoatRoughness; }
+    if (!useEnv) delete q.envMapIntensity;
+    if (matKind === 'phys') return wantPhysical || useCC ? new THREE.MeshPhysicalMaterial(q) : new THREE.MeshStandardMaterial(q);
+    if (matKind === 'std') return new THREE.MeshStandardMaterial(q);
+    var metal = q.metalness || 0, rough = q.roughness === undefined ? 0.5 : q.roughness;
+    delete q.metalness; delete q.roughness; delete q.envMapIntensity;
+    if (matKind === 'phong') {
+      q.shininess = Math.max(30, Math.min(130, 2 / (rough * rough + 0.01)));   /* glossy toy plastic */
+      q.specular = new THREE.Color(0x383838).lerp(new THREE.Color(0xbbbbbb), metal);
+      return new THREE.MeshPhongMaterial(q);
+    }
+    delete q.emissive; delete q.emissiveIntensity;
+    return new THREE.MeshBasicMaterial(q);
+  }
+  function PhysMat(p) { return makeMat(p, true); }
+  function StdMat(p) { return makeMat(p, false); }
+  renderer.domElement.addEventListener('webglcontextlost', function (ev) {
+    ev.preventDefault();
+    if (tier < 3 && BRIDGE && BRIDGE.tierUp) { try { BRIDGE.tierUp(); } catch (e) {} }
+  }, false);
 
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var T = 0.6, W = 3.7, H = 4.2, HALF = W / 2, zF = T / 2, GY = -H / 2;
   var F = '"Chakra Petch", system-ui, sans-serif';
   function C(hex) { return new THREE.Color(hex).convertSRGBToLinear(); }
 
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  var pixelRatio = O.pr ? parseFloat(O.pr) || 1 : (BRIDGE ? 1 : Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.setPixelRatio(pixelRatio);
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.LinearToneMapping;
   renderer.toneMappingExposure = 0.9;
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = useShadow;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   stage.appendChild(renderer.domElement);
 
@@ -57,11 +108,11 @@
     pm.dispose();
     return tex;
   }
-  scene.environment = buildEnv();
+  scene.environment = useEnv ? buildEnv() : null;
 
   var key = new THREE.DirectionalLight(0xffffff, 0.6);
   key.position.set(-5, 7, 8);
-  key.castShadow = true;
+  key.castShadow = useShadow;
   key.shadow.mapSize.set(2048, 2048);
   var sc = key.shadow.camera; sc.left = -8; sc.right = 8; sc.top = 8; sc.bottom = -8; sc.near = 1; sc.far = 30;
   key.shadow.bias = -0.0005;
@@ -69,31 +120,36 @@
   var rim = new THREE.DirectionalLight(0x9fc4ff, 0.35);
   rim.position.set(6, 4, -6);
   scene.add(rim);
-  scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x1a1f2b, 0.15));
+  var hemi = new THREE.HemisphereLight(0xcfe0ff, 0x1a1f2b, 0.15);
+  scene.add(hemi);
+  if (!useEnv) {      /* plastic look: no environment reflections, so light the shell directly */
+    key.intensity = 0.7; rim.intensity = 0.4; hemi.intensity = 0.5; hemi.groundColor.set(0x3a2a2a);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+  }
 
   /* ---------- materials ---------- */
   var baseRed = C(0xd2121c), baseRedDark = C(0x9e0d16);
   var lensOff = C(0x061030), lensOn = C(0x1a56ff);
-  var mRed = new THREE.MeshPhysicalMaterial({ color: baseRed.clone(), metalness: 0.85, roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.7 });
-  var mRedDark = new THREE.MeshPhysicalMaterial({ color: baseRedDark.clone(), metalness: 0.85, roughness: 0.23, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.6 });
-  var mIvory = new THREE.MeshStandardMaterial({ color: C(0xf0e8d4), roughness: 0.45, metalness: 0, envMapIntensity: 1.0 });
-  var mGasket = new THREE.MeshStandardMaterial({ color: C(0x0b0c10), roughness: 0.6, metalness: 0.1 });
-  var mMetal = new THREE.MeshStandardMaterial({ color: C(0xe6eaf0), roughness: 0.14, metalness: 1, envMapIntensity: 1.9 });
-  var mBlack = new THREE.MeshPhysicalMaterial({ color: C(0x1a1c21), roughness: 0.4, metalness: 0.15, clearcoat: 0.8, clearcoatRoughness: 0.08, envMapIntensity: 1.2 });
-  var mGreen = new THREE.MeshPhysicalMaterial({ color: C(0x14b84a), roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.04 });
-  var mTeal = new THREE.MeshPhysicalMaterial({ color: C(0x12c8d8), roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.04 });
-  var mPill = new THREE.MeshPhysicalMaterial({ color: C(0xe01820), roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.04 });
-  var mLens = new THREE.MeshPhysicalMaterial({ color: lensOff.clone(), emissive: C(0x1646ff), emissiveIntensity: 0, roughness: 0.06, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 2.2 });
+  var mRed = new PhysMat({ color: baseRed.clone(), metalness: 0.85, roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.7 });
+  var mRedDark = new PhysMat({ color: baseRedDark.clone(), metalness: 0.85, roughness: 0.23, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.6 });
+  var mIvory = new StdMat({ color: C(0xf0e8d4), roughness: 0.45, metalness: 0, envMapIntensity: 1.0 });
+  var mGasket = new StdMat({ color: C(0x0b0c10), roughness: 0.6, metalness: 0.1 });
+  var mMetal = new StdMat({ color: C(0xe6eaf0), roughness: 0.14, metalness: 1, envMapIntensity: 1.9 });
+  var mBlack = new PhysMat({ color: C(0x1a1c21), roughness: 0.4, metalness: 0.15, clearcoat: 0.8, clearcoatRoughness: 0.08, envMapIntensity: 1.2 });
+  var mGreen = new PhysMat({ color: C(0x14b84a), roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.04 });
+  var mTeal = new PhysMat({ color: C(0x12c8d8), roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.04 });
+  var mPill = new PhysMat({ color: C(0xe01820), roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.04 });
+  var mLens = new PhysMat({ color: lensOff.clone(), emissive: C(0x1646ff), emissiveIntensity: 0, roughness: 0.06, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 2.2 });
   var ledCols = [
     { on: C(0xff3b3b), off: C(0x2a0707), emi: C(0xff1a1a) },
     { on: C(0xffd23b), off: C(0x2a2204), emi: C(0xffc400) },
     { on: C(0x3bdc5a), off: C(0x062a0f), emi: C(0x14c83a) }
   ];
-  var mLedR = new THREE.MeshStandardMaterial({ color: ledCols[0].off.clone(), emissive: ledCols[0].emi, emissiveIntensity: 0, roughness: 0.25 });
-  var mLedY = new THREE.MeshStandardMaterial({ color: ledCols[1].off.clone(), emissive: ledCols[1].emi, emissiveIntensity: 0, roughness: 0.25 });
-  var mLedG = new THREE.MeshStandardMaterial({ color: ledCols[2].off.clone(), emissive: ledCols[2].emi, emissiveIntensity: 0, roughness: 0.25 });
+  var mLedR = new StdMat({ color: ledCols[0].off.clone(), emissive: ledCols[0].emi, emissiveIntensity: 0, roughness: 0.25 });
+  var mLedY = new StdMat({ color: ledCols[1].off.clone(), emissive: ledCols[1].emi, emissiveIntensity: 0, roughness: 0.25 });
+  var mLedG = new StdMat({ color: ledCols[2].off.clone(), emissive: ledCols[2].emi, emissiveIntensity: 0, roughness: 0.25 });
   var ledMats = [mLedR, mLedY, mLedG];
-  var mGlass = new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.13, roughness: 0.04, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 2, depthWrite: false });
+  var mGlass = new PhysMat({ color: 0xffffff, transparent: true, opacity: 0.13, roughness: 0.04, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 2, depthWrite: false });
   var mFocus = new THREE.MeshBasicMaterial({ color: C(0xffcb05) });
 
   /* ---------- geometry helpers ---------- */
@@ -220,15 +276,19 @@
     ctx.fillText(text, x, y);
   }
   var buttons = ['Settings', 'Network', 'Inputs', 'Live TV', 'Voice', 'Power'];
-  var cL = document.createElement('canvas'); cL.width = 1456; cL.height = 800;
-  var cR = document.createElement('canvas'); cR.width = 940; cR.height = 880;
-  var cC = document.createElement('canvas'); cC.width = 1120; cC.height = 256;
+  var cL = document.createElement('canvas'); cL.width = Math.round(1456 * TK); cL.height = Math.round(800 * TK);
+  var cR = document.createElement('canvas'); cR.width = Math.round(940 * TK); cR.height = Math.round(880 * TK);
+  var cC = document.createElement('canvas'); cC.width = Math.round(1120 * TK); cC.height = Math.round(256 * TK);
   var cN = document.createElement('canvas'); cN.width = 480; cN.height = 120;
+  function slim(t) {
+    if (lowmem) { t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; t.anisotropy = 1; }
+    return t;
+  }
   function mkTex(c) {
     var t = new THREE.CanvasTexture(c);
     t.encoding = THREE.sRGBEncoding;
     t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-    return t;
+    return slim(t);
   }
   var tL = mkTex(cL), tR = mkTex(cR), tC = mkTex(cC), tN = mkTex(cN);
 
@@ -256,6 +316,7 @@
   }
   function drawLeft() {
     var ctx = cL.getContext('2d'), a = apps[focus];
+    ctx.setTransform(TK, 0, 0, TK, 0, 0);
     screenBase(ctx, 1456, 800, true);
     if (!a) { tL.needsUpdate = true; return; }
     ensureHero(a);
@@ -282,6 +343,7 @@
   }
   function drawRight() {
     var ctx = cR.getContext('2d');
+    ctx.setTransform(TK, 0, 0, TK, 0, 0);
     screenBase(ctx, 940, 880, false);
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.fillStyle = '#e8f6fb'; ctx.font = '700 48px ' + F; ctx.fillText('Apps', 34, 48);
@@ -326,6 +388,7 @@
   }
   function drawClock() {
     var ctx = cC.getContext('2d');
+    ctx.setTransform(TK, 0, 0, TK, 0, 0);
     var g = ctx.createLinearGradient(0, 0, 1120, 256);
     g.addColorStop(0, '#10305a'); g.addColorStop(1, '#050d1e');
     ctx.fillStyle = g; ctx.fillRect(0, 0, 1120, 256);
@@ -367,7 +430,7 @@
     ctx.font = '600 38px ' + F; ctx.fillText(label, 100, 238);
     var t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding;
     t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-    return t;
+    return slim(t);
   }
   var btnMats = buttons.map(function (b) { return new THREE.MeshBasicMaterial({ map: mkBtnTex(b), transparent: true, toneMapped: false, depthWrite: false }); });
   function drawAll() { drawLeft(); drawRight(); drawClock(); drawName(); }
@@ -385,7 +448,8 @@
   var mScreenR = new THREE.MeshBasicMaterial({ map: tR, toneMapped: false });
   var mScreenC = new THREE.MeshBasicMaterial({ map: tC, toneMapped: false });
   var mScreenN = new THREE.MeshBasicMaterial({ map: tN, transparent: true, toneMapped: false, depthWrite: false });
-  var mSign = new THREE.MeshStandardMaterial({ color: C(0xe9edf2), metalness: 1, roughness: 0.2, envMapIntensity: 2.0 });
+  var mScreenS = new THREE.MeshBasicMaterial({ color: C(0x04070d), toneMapped: false });
+  var mSign = new StdMat({ color: C(0xe9edf2), metalness: 1, roughness: 0.2, envMapIntensity: 2.0 });
   function makeSheen(w, h) {
     var c = document.createElement('canvas'); c.width = w; c.height = h;
     var x = c.getContext('2d');
@@ -405,10 +469,10 @@
     x.strokeStyle = 'rgba(255,255,255,0.28)'; x.lineWidth = 3;
     rrect(x, 3, 3, w - 6, h - 6, Math.min(w, h) * 0.03); x.stroke();
     var t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding;
-    return t;
+    return slim(t);
   }
-  var mSheenL = new THREE.MeshBasicMaterial({ map: makeSheen(1024, 563), transparent: true, depthWrite: false, toneMapped: false });
-  var mSheenR = new THREE.MeshBasicMaterial({ map: makeSheen(1024, 958), transparent: true, depthWrite: false, toneMapped: false });
+  var mSheenL = new THREE.MeshBasicMaterial({ map: makeSheen(lowmem ? 256 : 1024, lowmem ? 141 : 563), transparent: true, depthWrite: false, toneMapped: false });
+  var mSheenR = new THREE.MeshBasicMaterial({ map: makeSheen(lowmem ? 256 : 1024, lowmem ? 240 : 958), transparent: true, depthWrite: false, toneMapped: false });
 
   /* ---------- real 3D lettering: trace the glyph mask, then extrude the outlines ---------- */
   var SEG = { 1: ['T', 'L'], 2: ['R', 'T'], 3: ['R', 'L'], 4: ['B', 'R'], 6: ['B', 'T'], 7: ['B', 'L'], 8: ['L', 'B'], 9: ['T', 'B'], 11: ['R', 'B'], 12: ['L', 'R'], 13: ['T', 'R'], 14: ['L', 'T'] };
@@ -526,6 +590,7 @@
     g.add(disc(rRing + 0.06, 0.04, mGasket, x, y, z + 0.02));
     g.add(disc(rRing, 0.07, mMetal, x, y, z + 0.035));
     g.add(disc(rRing - 0.05, 0.075, mGasket, x, y, z + 0.04));
+    if (O.nolens === '1') return;   /* render-only: leave the socket empty so the native app can show a picture in it */
     var dome = new THREE.Mesh(new THREE.SphereGeometry(rDome, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2), mLens);
     dome.rotation.x = Math.PI / 2; dome.scale.y = 0.6; dome.position.set(x, y, z + 0.07);
     dome.castShadow = true; g.add(dome);
@@ -581,28 +646,23 @@
     var shL = new THREE.Mesh(new THREE.PlaneGeometry(2.82, 1.56), mSheenL);
     shL.position.set(0, 0.1, zF + 0.168); g.add(shL);
     /* date and time: a quadrilateral with one sharp corner, sitting in the red wedge right on the ivory edge */
-    var q = [[-0.15, 1.10], [1.67, 1.10], [1.67, 1.51], [0.55, 1.51]];
-    var ck = slab(roundedPoly(inflate(q, 0.03), [0.0001, 0.02, 0.02, 0.02]), 0.02, 0.012, mGasket);
+    var q = [[0.22, 1.17], [1.67, 1.17], [1.67, 1.51], [0.62, 1.51], [0.10, 1.25]];
+    var ck = slab(roundedPoly(inflate(q, 0.03), [0.05, 0.02, 0.02, 0.02, 0.05]), 0.02, 0.012, mGasket);
     ck.position.z = zF + 0.07; g.add(ck);
     var cd = polyMesh(q, mScreenC); cd.position.z = zF + 0.1; g.add(cd);
     var cgl = polyMesh(q, mGlass); cgl.position.z = zF + 0.105; g.add(cgl);
     g.add(ball(0.035, mLedR, -0.12, 0.99, zF + 0.1)); g.add(ball(0.035, mLedR, 0.12, 0.99, zF + 0.1));
-    g.add(ring(0.19, 0.025, mMetal, -0.95, -1.0, zF + 0.1));
-    g.add(disc(0.15, 0.06, mPill, -0.95, -1.0, zF + 0.1));
+    g.add(disc(0.215, 0.05, mGasket, -0.95, -1.0, zF + 0.095));
+    var domeBtn = new THREE.Mesh(new THREE.SphereGeometry(0.165, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2), mPill);
+    domeBtn.rotation.x = Math.PI / 2; domeBtn.scale.y = 0.5; domeBtn.position.set(-0.95, -1.0, zF + 0.12); g.add(domeBtn);
     for (var i = 0; i < 3; i++) {
       var s = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.03, 0.03), mGasket);
       s.position.set(1.15, -0.9 - i * 0.1, zF + 0.1); g.add(s);
     }
-    /* control cluster, kept inside the body with an even margin */
-    g.add(ring(0.17, 0.022, mGasket, -1.4, -1.68, zF + 0.01));
-    g.add(disc(0.14, 0.07, mBlack, -1.4, -1.68, zF + 0.03));
-    var pillR = slab(roundedPoly(rectPts(0.36, 0.07, -0.8, -1.5), 0.035), 0.03, 0.02, mPill); pillR.position.z = zF + 0.02; g.add(pillR);
-    var pillT = slab(roundedPoly(rectPts(0.36, 0.07, -0.35, -1.5), 0.035), 0.03, 0.02, mTeal); pillT.position.z = zF + 0.02; g.add(pillT);
-    var bar = slab(roundedPoly(rectPts(1.3, 0.22, -0.5, -1.78), 0.08), 0.04, 0.02, mGreen); bar.position.z = zF + 0.03; g.add(bar);
-    var a = 0.08, l = 0.26, ox = 1.1, oy = -1.7;
-    var cross = [[a, -l], [a, -a], [l, -a], [l, a], [a, a], [a, l], [-a, l], [-a, a], [-l, a], [-l, -a], [-a, -a], [-a, -l]];
-    var dpad = slab(roundedPoly(shift(cross, ox, oy), 0.04), 0.05, 0.025, mBlack); dpad.position.z = zF + 0.04; g.add(dpad);
-    g.add(disc(0.045, 0.03, mGasket, ox, oy, zF + 0.09));
+    /* status display: a recessed bezel around a flat dark screen that the native app draws on */
+    var lcdBez = slab(roundedPoly(rectPts(2.36, 0.46, 0, -1.66), 0.14), 0.04, 0.02, mGasket); lcdBez.position.z = zF + 0.01; g.add(lcdBez);
+    var lcdFrame = slab(roundedPoly(rectPts(2.24, 0.34, 0, -1.66), 0.1), 0.02, 0.012, mBlack); lcdFrame.position.z = zF + 0.05; g.add(lcdFrame);
+    var lcd = new THREE.Mesh(new THREE.PlaneGeometry(2.16, 0.26), mScreenS); lcd.position.set(0, -1.66, zF + 0.085); g.add(lcd);
     return g;
   }
   function buildLid() {
@@ -628,12 +688,23 @@
     glass.position.set(0, 0.42, zF + 0.133); g.add(glass);
     var shR = new THREE.Mesh(new THREE.PlaneGeometry(2.96, 2.77), mSheenR);
     shR.position.set(0, 0.42, zF + 0.138); g.add(shR);
-    var panel = slab(roundedPoly(rectPts(3.1, 0.8, 0, -1.58), 0.16), 0.03, 0.02, mGasket);
-    panel.position.z = zF + 0.02; g.add(panel);
+    if (O.keys !== '2') {
+      var panel = slab(roundedPoly(rectPts(3.1, 0.8, 0, -1.58), 0.16), 0.03, 0.02, mGasket);
+      panel.position.z = zF + 0.02; g.add(panel);
+    }
     var xs = [-1.25, -0.75, -0.25, 0.25, 0.75, 1.25], rings = [];
     for (var i = 0; i < 6; i++) {
+      if (O.keys === '2') {   /* render-only: coloured jelly caps seated in black rims, straight on the red shell */
+        var capCol = [0xffc21a, 0x22c55e, 0x3b82f6, 0x14c8d4, 0xa855f7, 0xef4444][i];
+        var rim = slab(roundedPoly(rectPts(0.45, 0.45, xs[i], -1.5), 0.15), 0.03, 0.015, mGasket); rim.position.z = zF + 0.0; g.add(rim);
+        var capMat = O.cap === 'black' ? mBlack : O.cap === 'cream' ? new StdMat({ color: C(0xf0e8d4), roughness: 0.4, metalness: 0 }) : new StdMat({ color: C(capCol), roughness: 0.28, metalness: 0.02 });
+        var cap = slab(roundedPoly(rectPts(0.4, 0.4, xs[i], -1.5), 0.13), 0.075, 0.032, capMat); cap.position.z = zF + 0.03; g.add(cap);
+      } else if (O.keys === '1') {   /* render-only: raised keys like the D-pad, for the native launcher's body image */
+        var keyMesh = slab(roundedPoly(rectPts(0.4, 0.4, xs[i], -1.5), 0.085), 0.07, 0.03, mBlack); keyMesh.position.z = zF + 0.035; g.add(keyMesh);
+      } else {
       g.add(ring(0.165, 0.016, mMetal, xs[i], -1.5, zF + 0.07));
       g.add(disc(0.15, 0.07, mBlack, xs[i], -1.5, zF + 0.065));
+      }
       var pl = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.52), btnMats[i]);
       pl.position.set(xs[i], -1.579, zF + 0.108); g.add(pl);
       var fr = ring(0.21, 0.022, mFocus, xs[i], -1.5, zF + 0.08);
@@ -674,10 +745,11 @@
   function pose(d, p) {
     d.flap.rotation.y = -Math.PI * (1 - p);
     d.root.position.x = HALF * (1 - p);
-    d.pivot.rotation.y = THREE.MathUtils.lerp(-0.3, 0.12, p);
+    d.pivot.rotation.y = THREE.MathUtils.lerp(-0.12, 0, p);
   }
   var D = buildDevice(false);
   var R = buildDevice(true);
+  scene.remove(R.pivot);                                              /* no floor reflection */
   if (!(document.fonts && document.fonts.load)) rebuildSign();
   setTimeout(function () { if (!signBuilt) rebuildSign(); }, 2500);
   function updateRings() {
@@ -710,8 +782,9 @@
   });
   var contact = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: contactTex, transparent: true, depthWrite: false }));
   contact.rotation.x = -Math.PI / 2; contact.position.y = GY + 0.003; contact.renderOrder = 3; scene.add(contact);
-  var ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.ShadowMaterial({ opacity: 0.35 }));
+  var ground = useShadow ? new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.ShadowMaterial({ opacity: 0.35 })) : new THREE.Group();
   ground.rotation.x = -Math.PI / 2; ground.position.y = GY + 0.004; ground.receiveShadow = true; ground.renderOrder = 4; scene.add(ground);
+  [floor, glow, contact, ground].forEach(function (o) { o.visible = false; });   /* no floor, glow or shadow: the device just fills the screen */
 
   /* ---------- state, animation ---------- */
   var state = 'closed';
@@ -734,7 +807,7 @@
     pFrom = p; pTo = v; pStart = performance.now();
     pDur = reduce ? 0.01 : (v ? 1.6 : 1.3);
     state = v ? 'opening' : 'closing';
-    if (v) burstStart = performance.now(); else closeStart = performance.now();
+    if (v) { burstStart = performance.now(); openFrames = 0; if (BRIDGE && BRIDGE.mark) { try { BRIDGE.mark('opening'); } catch (e) {} } } else closeStart = performance.now();
   }
   function startPrime() {
     state = 'priming'; primeStart = performance.now(); flareStart = primeStart; hint();
@@ -761,7 +834,7 @@
     qLevel++;
     if (qLevel === 1) { R.pivot.visible = false; floor.visible = false; glow.visible = false; }
     else if (qLevel === 2) { key.castShadow = false; ground.visible = false; }
-    else if (qLevel === 3) { renderer.setPixelRatio(0.75); resize(); }
+    else if (qLevel === 3) { renderer.setPixelRatio(Math.min(pixelRatio, 0.75)); resize(); }
     try { console.log('CopperDex: reduced visual quality to level ' + qLevel); } catch (e) {}
   }
   function watchPerf(dt) {
@@ -777,15 +850,35 @@
     renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
     var th = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-    distOpen = Math.max(2 * W * 1.13 / (th * camera.aspect), H * 1.18 / th);
-    distClosed = Math.max(W * 1.2 / (th * camera.aspect), H * 1.2 / th);
+    distOpen = Math.max(2 * W / (th * camera.aspect), H / th) + zF;       /* the open front face fills the screen edge to edge */
+    distClosed = Math.max(W * 1.1 / (th * camera.aspect), H * 1.08 / th) + zF;
     hint();
   }
   window.addEventListener('resize', resize);
   resize();
 
   var tmpV = new THREE.Vector3(), look = new THREE.Vector3(), launchPos = new THREE.Vector3(), launchLook = new THREE.Vector3(), wp = new THREE.Vector3(), dir = new THREE.Vector3();
+  var okFrames = 0, openFrames = 0, lastDraw = 0, capMs = O.fps !== undefined ? (parseFloat(O.fps) > 0 ? 1000 / parseFloat(O.fps) : 0) : (BRIDGE ? 1000 / 30 : 0);
+  var statN = 0, statT = 0, statEl = null;
+  if (O.show === '1') {
+    statEl = document.createElement('div');
+    statEl.style.cssText = 'position:fixed;left:8px;top:6px;z-index:9;color:#9ff;font:16px monospace;background:rgba(0,0,0,.55);padding:2px 6px';
+    document.body.appendChild(statEl);
+  }
+  function stats(now) {
+    statN++;
+    if (!statT) statT = now;
+    if (now - statT >= 2000) {
+      var fps = statN * 1000 / (now - statT);
+      statN = 0; statT = now;
+      var mem = renderer.info.memory, line = 'tex ' + mem.textures + ' geo ' + mem.geometries + ' fps ' + fps.toFixed(1) + ' tier ' + tier + ' mat ' + matKind + ' cc ' + (+useCC) + ' sh ' + (+useShadow) + ' env ' + (+useEnv) + ' pr ' + pixelRatio + ' q ' + qLevel;
+      if (statEl) statEl.textContent = line;
+      try { console.log('CopperDex ' + line); } catch (e) {}
+    }
+  }
   function frame(now) {
+    if (capMs && now - lastDraw < capMs - 3) { requestAnimationFrame(frame); return; }
+    lastDraw = now;
     if (standby) { lastNow = now; requestAnimationFrame(frame); return; }
     var t = now / 1000;
     var dt = Math.min(0.1, Math.max(0, (now - lastNow) / 1000)); lastNow = now;
@@ -798,14 +891,13 @@
       } else if (state === 'closing') { state = 'closed'; hint(); }
     }
     pose(D, p); pose(R, p);
-    contact.scale.set(THREE.MathUtils.lerp(4.4, 9.4, p), 3, 1);
     var lk = Math.min(1, (now - launchStart) / 1000 / 0.9);
     launch = launchFrom + (launchTo - launchFrom) * ease(lk);
     fadeEl.style.opacity = String(Math.max(0, Math.min(1, (launch - 0.6) / 0.4)));
     px += (tpx - px) * 0.06; py += (tpy - py) * 0.06;
     var dist = THREE.MathUtils.lerp(distClosed, distOpen, p);
-    tmpV.set(px * 0.5, 0.45 + py * 0.3, dist);
-    look.set(0, -0.05, 0);
+    tmpV.set(0, 0, dist);
+    look.set(0, 0, 0);
     if (launch > 0.001) {
       D.pivot.updateMatrixWorld(true);
       D.left.userData.disp.getWorldPosition(wp);
@@ -840,9 +932,18 @@
       ledMats[i3].emissiveIntensity = ledLevel[i3] * 1.2;
     }
     renderer.render(scene, camera);
-    watchPerf(dt);
+    stats(now);
+    if (okFrames < 90 && ++okFrames === 90 && BRIDGE && BRIDGE.bootOk) { try { BRIDGE.bootOk(); } catch (e) {} }
+    if (state === 'open' && openFrames < 60 && ++openFrames === 60 && BRIDGE && BRIDGE.mark) { try { BRIDGE.mark('openOk'); } catch (e) {} }
+    if (O.nodegrade !== '1') watchPerf(dt);
     requestAnimationFrame(frame);
   }
+  if (O.compile === '1') { try { renderer.compile(scene, camera); } catch (e) {} }   /* off by default: it crashed this TV's driver at startup */
+  if (O.debug === '1') {   /* hook for tools/render-shell.js, which renders the device body for the native launcher */
+    window.__dex = { THREE: THREE, scene: scene, camera: camera, renderer: renderer, D: D, setTarget: setTarget,
+      mats: { L: mScreenL, R: mScreenR, C: mScreenC, N: mScreenN, S: mScreenS, SL: mSheenL, SR: mSheenR, glass: mGlass, btn: btnMats }, state: function () { return state; } };
+  }
+  if (tier) msg('Graphics mode ' + tier, 4000);
   requestAnimationFrame(frame);
 
   /* ---------- input ---------- */
