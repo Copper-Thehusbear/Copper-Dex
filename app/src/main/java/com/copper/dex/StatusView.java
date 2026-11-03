@@ -111,7 +111,7 @@ final class StatusView extends DView {
 
  @Override void paintDesign(Canvas c) {
   float x0 = Design.STATUS.left, y0 = Design.STATUS.top, w = Design.STATUS.width(), h = Design.STATUS.height();
-  float c1 = x0 + 196, c2 = x0 + 404;
+  float c1 = x0 + 186, c2 = x0 + 426;
   // dividers
   tmp.set(c1, y0 + 12, c1 + 1.5f, y0 + h - 12); c.drawRect(tmp, line);
   tmp.set(c2, y0 + 12, c2 + 1.5f, y0 + h - 12); c.drawRect(tmp, line);
@@ -132,11 +132,12 @@ final class StatusView extends DView {
    c.drawText("All clear", nx, y0 + 53, big);
   } else {
    NotifService.Item it = list.get(0);
-   c.drawText(list.size() + (list.size() == 1 ? " NOTICE  ·  " : " NOTICES  ·  ") + it.app.toUpperCase(Locale.ENGLISH), nx, y0 + 28, small);
+   String head = list.size() + (list.size() == 1 ? " NOTICE  ·  " : " NOTICES  ·  ") + it.app.toUpperCase(Locale.ENGLISH);
+   c.drawText(fit(head, small, c2 - nx - 12), nx, y0 + 28, small);
    c.drawText(fit(it.title.isEmpty() ? it.app : it.title, big, c2 - nx - 12), nx, y0 + 54, big);
   }
   // storage
-  float sx = c2 + 22;
+  float sx = c2 + 20;
   c.drawText("STORAGE", sx, y0 + 29, small);
   c.drawText(fit(free, sub, w - (sx - x0) - 14), sx, y0 + 47, sub);
   tmp.set(sx, y0 + 53, x0 + w - 18, y0 + 58);
