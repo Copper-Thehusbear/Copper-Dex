@@ -931,6 +931,10 @@
     requestAnimationFrame(frame);
   }
   if (O.compile === '1') { try { renderer.compile(scene, camera); } catch (e) {} }   /* off by default: it crashed this TV's driver at startup */
+  if (O.debug === '1') {   /* hook for tools/render-shell.js, which renders the device body for the native launcher */
+    window.__dex = { THREE: THREE, scene: scene, camera: camera, renderer: renderer, D: D, setTarget: setTarget,
+      mats: { L: mScreenL, R: mScreenR, C: mScreenC, N: mScreenN, SL: mSheenL, SR: mSheenR, glass: mGlass, btn: btnMats }, state: function () { return state; } };
+  }
   if (tier) msg('Graphics mode ' + tier, 4000);
   requestAnimationFrame(frame);
 
