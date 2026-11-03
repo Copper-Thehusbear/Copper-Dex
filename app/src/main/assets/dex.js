@@ -22,6 +22,39 @@
   try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); }
   catch (e) { msg('WebGL is not available on this device'); return; }
 
+  /* Some TV GPU drivers (PowerVR) crash while compiling the full physical shaders, which kills the whole app.
+     tier 0 = full look, 1 = no clearcoat or shadows, 2 = Phong without the environment map, 3 = unlit.
+     The native side raises the tier by itself after a crash (see MainActivity.bootTier). */
+  var tier = 0;
+  try { tier = BRIDGE && BRIDGE.bootTier ? (BRIDGE.bootTier() | 0) : (parseInt((location.search.match(/[?&]tier=(\d)/) || [])[1], 10) || 0); } catch (e) { tier = 0; }
+  try {
+    var gl = renderer.getContext(), dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    var gpuName = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : '';
+    if (tier < 1 && /powervr/i.test(gpuName)) tier = 1;
+  } catch (e) {}
+  tier = Math.max(0, Math.min(3, tier));
+  function liteMat(p) {
+    var q = {}, k;
+    for (k in p) q[k] = p[k];
+    delete q.clearcoat; delete q.clearcoatRoughness; delete q.envMapIntensity;
+    if (tier === 1) return new THREE.MeshStandardMaterial(q);
+    var metal = q.metalness || 0, rough = q.roughness === undefined ? 0.5 : q.roughness;
+    delete q.metalness; delete q.roughness;
+    if (tier === 2) {
+      q.shininess = Math.max(8, Math.min(160, 2 / (rough * rough + 0.01)));
+      q.specular = new THREE.Color(0x222222).lerp(new THREE.Color(0x999999), metal);
+      return new THREE.MeshPhongMaterial(q);
+    }
+    delete q.emissive; delete q.emissiveIntensity;
+    return new THREE.MeshBasicMaterial(q);
+  }
+  function PhysMat(p) { return tier === 0 ? new THREE.MeshPhysicalMaterial(p) : liteMat(p); }
+  function StdMat(p) { return tier === 0 ? new THREE.MeshStandardMaterial(p) : liteMat(p); }
+  renderer.domElement.addEventListener('webglcontextlost', function (ev) {
+    ev.preventDefault();
+    if (tier < 3 && BRIDGE && BRIDGE.tierUp) { try { BRIDGE.tierUp(); } catch (e) {} }
+  }, false);
+
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var T = 0.6, W = 3.7, H = 4.2, HALF = W / 2, zF = T / 2, GY = -H / 2;
   var F = '"Chakra Petch", system-ui, sans-serif';
@@ -31,7 +64,7 @@
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.LinearToneMapping;
   renderer.toneMappingExposure = 0.9;
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = tier === 0;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   stage.appendChild(renderer.domElement);
 
@@ -57,11 +90,11 @@
     pm.dispose();
     return tex;
   }
-  scene.environment = buildEnv();
+  scene.environment = tier >= 2 ? null : buildEnv();
 
   var key = new THREE.DirectionalLight(0xffffff, 0.6);
   key.position.set(-5, 7, 8);
-  key.castShadow = true;
+  key.castShadow = tier === 0;
   key.shadow.mapSize.set(2048, 2048);
   var sc = key.shadow.camera; sc.left = -8; sc.right = 8; sc.top = 8; sc.bottom = -8; sc.near = 1; sc.far = 30;
   key.shadow.bias = -0.0005;
@@ -74,26 +107,26 @@
   /* ---------- materials ---------- */
   var baseRed = C(0xd2121c), baseRedDark = C(0x9e0d16);
   var lensOff = C(0x061030), lensOn = C(0x1a56ff);
-  var mRed = new THREE.MeshPhysicalMaterial({ color: baseRed.clone(), metalness: 0.85, roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.7 });
-  var mRedDark = new THREE.MeshPhysicalMaterial({ color: baseRedDark.clone(), metalness: 0.85, roughness: 0.23, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.6 });
-  var mIvory = new THREE.MeshStandardMaterial({ color: C(0xf0e8d4), roughness: 0.45, metalness: 0, envMapIntensity: 1.0 });
-  var mGasket = new THREE.MeshStandardMaterial({ color: C(0x0b0c10), roughness: 0.6, metalness: 0.1 });
-  var mMetal = new THREE.MeshStandardMaterial({ color: C(0xe6eaf0), roughness: 0.14, metalness: 1, envMapIntensity: 1.9 });
-  var mBlack = new THREE.MeshPhysicalMaterial({ color: C(0x1a1c21), roughness: 0.4, metalness: 0.15, clearcoat: 0.8, clearcoatRoughness: 0.08, envMapIntensity: 1.2 });
-  var mGreen = new THREE.MeshPhysicalMaterial({ color: C(0x14b84a), roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.04 });
-  var mTeal = new THREE.MeshPhysicalMaterial({ color: C(0x12c8d8), roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.04 });
-  var mPill = new THREE.MeshPhysicalMaterial({ color: C(0xe01820), roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.04 });
-  var mLens = new THREE.MeshPhysicalMaterial({ color: lensOff.clone(), emissive: C(0x1646ff), emissiveIntensity: 0, roughness: 0.06, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 2.2 });
+  var mRed = new PhysMat({ color: baseRed.clone(), metalness: 0.85, roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.7 });
+  var mRedDark = new PhysMat({ color: baseRedDark.clone(), metalness: 0.85, roughness: 0.23, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.6 });
+  var mIvory = new StdMat({ color: C(0xf0e8d4), roughness: 0.45, metalness: 0, envMapIntensity: 1.0 });
+  var mGasket = new StdMat({ color: C(0x0b0c10), roughness: 0.6, metalness: 0.1 });
+  var mMetal = new StdMat({ color: C(0xe6eaf0), roughness: 0.14, metalness: 1, envMapIntensity: 1.9 });
+  var mBlack = new PhysMat({ color: C(0x1a1c21), roughness: 0.4, metalness: 0.15, clearcoat: 0.8, clearcoatRoughness: 0.08, envMapIntensity: 1.2 });
+  var mGreen = new PhysMat({ color: C(0x14b84a), roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.04 });
+  var mTeal = new PhysMat({ color: C(0x12c8d8), roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.04 });
+  var mPill = new PhysMat({ color: C(0xe01820), roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.04 });
+  var mLens = new PhysMat({ color: lensOff.clone(), emissive: C(0x1646ff), emissiveIntensity: 0, roughness: 0.06, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 2.2 });
   var ledCols = [
     { on: C(0xff3b3b), off: C(0x2a0707), emi: C(0xff1a1a) },
     { on: C(0xffd23b), off: C(0x2a2204), emi: C(0xffc400) },
     { on: C(0x3bdc5a), off: C(0x062a0f), emi: C(0x14c83a) }
   ];
-  var mLedR = new THREE.MeshStandardMaterial({ color: ledCols[0].off.clone(), emissive: ledCols[0].emi, emissiveIntensity: 0, roughness: 0.25 });
-  var mLedY = new THREE.MeshStandardMaterial({ color: ledCols[1].off.clone(), emissive: ledCols[1].emi, emissiveIntensity: 0, roughness: 0.25 });
-  var mLedG = new THREE.MeshStandardMaterial({ color: ledCols[2].off.clone(), emissive: ledCols[2].emi, emissiveIntensity: 0, roughness: 0.25 });
+  var mLedR = new StdMat({ color: ledCols[0].off.clone(), emissive: ledCols[0].emi, emissiveIntensity: 0, roughness: 0.25 });
+  var mLedY = new StdMat({ color: ledCols[1].off.clone(), emissive: ledCols[1].emi, emissiveIntensity: 0, roughness: 0.25 });
+  var mLedG = new StdMat({ color: ledCols[2].off.clone(), emissive: ledCols[2].emi, emissiveIntensity: 0, roughness: 0.25 });
   var ledMats = [mLedR, mLedY, mLedG];
-  var mGlass = new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.13, roughness: 0.04, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 2, depthWrite: false });
+  var mGlass = new PhysMat({ color: 0xffffff, transparent: true, opacity: 0.13, roughness: 0.04, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 2, depthWrite: false });
   var mFocus = new THREE.MeshBasicMaterial({ color: C(0xffcb05) });
 
   /* ---------- geometry helpers ---------- */
@@ -385,7 +418,7 @@
   var mScreenR = new THREE.MeshBasicMaterial({ map: tR, toneMapped: false });
   var mScreenC = new THREE.MeshBasicMaterial({ map: tC, toneMapped: false });
   var mScreenN = new THREE.MeshBasicMaterial({ map: tN, transparent: true, toneMapped: false, depthWrite: false });
-  var mSign = new THREE.MeshStandardMaterial({ color: C(0xe9edf2), metalness: 1, roughness: 0.2, envMapIntensity: 2.0 });
+  var mSign = new StdMat({ color: C(0xe9edf2), metalness: 1, roughness: 0.2, envMapIntensity: 2.0 });
   function makeSheen(w, h) {
     var c = document.createElement('canvas'); c.width = w; c.height = h;
     var x = c.getContext('2d');
@@ -710,7 +743,7 @@
   });
   var contact = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: contactTex, transparent: true, depthWrite: false }));
   contact.rotation.x = -Math.PI / 2; contact.position.y = GY + 0.003; contact.renderOrder = 3; scene.add(contact);
-  var ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.ShadowMaterial({ opacity: 0.35 }));
+  var ground = tier === 0 ? new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.ShadowMaterial({ opacity: 0.35 })) : new THREE.Group();
   ground.rotation.x = -Math.PI / 2; ground.position.y = GY + 0.004; ground.receiveShadow = true; ground.renderOrder = 4; scene.add(ground);
 
   /* ---------- state, animation ---------- */
@@ -785,6 +818,7 @@
   resize();
 
   var tmpV = new THREE.Vector3(), look = new THREE.Vector3(), launchPos = new THREE.Vector3(), launchLook = new THREE.Vector3(), wp = new THREE.Vector3(), dir = new THREE.Vector3();
+  var okFrames = 0;
   function frame(now) {
     if (standby) { lastNow = now; requestAnimationFrame(frame); return; }
     var t = now / 1000;
@@ -840,9 +874,11 @@
       ledMats[i3].emissiveIntensity = ledLevel[i3] * 1.2;
     }
     renderer.render(scene, camera);
+    if (okFrames < 90 && ++okFrames === 90 && BRIDGE && BRIDGE.bootOk) { try { BRIDGE.bootOk(); } catch (e) {} }
     watchPerf(dt);
     requestAnimationFrame(frame);
   }
+  if (tier) msg('Graphics mode ' + tier, 4000);
   requestAnimationFrame(frame);
 
   /* ---------- input ---------- */

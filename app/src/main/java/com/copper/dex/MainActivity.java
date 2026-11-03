@@ -3,6 +3,7 @@ package com.copper.dex;
 import android.app.Activity;
 import android.os.Bundle;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.webkit.WebResourceRequest;
 import android.graphics.Color;
 import android.content.pm.PackageManager;
@@ -30,6 +31,7 @@ public class MainActivity extends Activity {
  private WebView web;
  @Override public void onCreate(Bundle state) {
   super.onCreate(state);
+  if(getIntent().hasExtra("tier"))prefs().edit().putBoolean("forcedUsed",false).commit();
   getWindow().getDecorView().setSystemUiVisibility(5894 | View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
   web=new WebView(this);
   web.getSettings().setJavaScriptEnabled(true);
@@ -52,7 +54,26 @@ public class MainActivity extends Activity {
   if(direction!=null){ final String val=direction; web.evaluateJavascript("window.copperKey&&window.copperKey('"+val+"')",null);return true; }
   return super.onKeyDown(key,event);
  }
+ private static final int MAX_TIER=3;
+ private SharedPreferences prefs(){return getSharedPreferences("copper",MODE_PRIVATE);}
  private final class Bridge {
+  /* Graphics tier: raised by one after a launch that never reached a stable frame (the TV's GPU driver crashed).
+     Force one for testing with: adb shell am start -n com.copper.dex/.MainActivity --ei tier 2 */
+  @JavascriptInterface public synchronized int bootTier(){
+   SharedPreferences sp=prefs(); int forced=getIntent().getIntExtra("tier",-1);
+   int t=sp.getInt("tier",0);
+   if(forced>=0&&!sp.getBoolean("forcedUsed",false)){ t=Math.min(MAX_TIER,forced); sp.edit().putInt("tier",t).putBoolean("forcedUsed",true).putBoolean("booting",true).commit(); return t; }
+   if(sp.getBoolean("booting",false)){ t=Math.min(MAX_TIER,t+1); sp.edit().putInt("tier",t).commit(); }
+   sp.edit().putBoolean("booting",true).commit();
+   return t;
+  }
+  @JavascriptInterface public synchronized void bootOk(){ prefs().edit().putBoolean("booting",false).commit(); }
+  @JavascriptInterface public synchronized int tierUp(){
+   SharedPreferences sp=prefs(); int t=Math.min(MAX_TIER,sp.getInt("tier",0)+1);
+   sp.edit().putInt("tier",t).putBoolean("booting",false).commit();
+   runOnUiThread(()->web.loadUrl("file:///android_asset/index.html"));
+   return t;
+  }
   @JavascriptInterface public String apps(){
    JSONArray out=new JSONArray(); PackageManager pm=getPackageManager();
    Set<String> seen=new HashSet<>();
