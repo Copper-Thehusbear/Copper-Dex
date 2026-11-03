@@ -657,12 +657,12 @@
       s.position.set(1.15, -0.9 - i * 0.1, zF + 0.1); g.add(s);
     }
     /* control cluster, kept inside the body with an even margin */
-    g.add(ring(0.17, 0.022, mGasket, -1.4, -1.68, zF + 0.01));
-    g.add(disc(0.14, 0.07, mBlack, -1.4, -1.68, zF + 0.03));
-    var pillR = slab(roundedPoly(rectPts(0.36, 0.07, -0.8, -1.5), 0.035), 0.03, 0.02, mPill); pillR.position.z = zF + 0.02; g.add(pillR);
-    var pillT = slab(roundedPoly(rectPts(0.36, 0.07, -0.35, -1.5), 0.035), 0.03, 0.02, mTeal); pillT.position.z = zF + 0.02; g.add(pillT);
-    var bar = slab(roundedPoly(rectPts(1.3, 0.22, -0.5, -1.78), 0.08), 0.04, 0.02, mGreen); bar.position.z = zF + 0.03; g.add(bar);
-    var a = 0.08, l = 0.26, ox = 1.1, oy = -1.7;
+    g.add(ring(0.17, 0.022, mGasket, 1.15, -1.7, zF + 0.01));
+    g.add(disc(0.14, 0.07, mBlack, 1.15, -1.7, zF + 0.03));
+    var pillR = slab(roundedPoly(rectPts(0.36, 0.07, -0.22, -1.52), 0.035), 0.03, 0.02, mPill); pillR.position.z = zF + 0.02; g.add(pillR);
+    var pillT = slab(roundedPoly(rectPts(0.36, 0.07, 0.22, -1.52), 0.035), 0.03, 0.02, mTeal); pillT.position.z = zF + 0.02; g.add(pillT);
+    var bar = slab(roundedPoly(rectPts(1.0, 0.22, 0, -1.78), 0.08), 0.04, 0.02, mGreen); bar.position.z = zF + 0.03; g.add(bar);
+    var a = 0.09, l = 0.26, ox = -1.2, oy = -1.7;
     var cross = [[a, -l], [a, -a], [l, -a], [l, a], [a, a], [a, l], [-a, l], [-a, a], [-l, a], [-l, -a], [-a, -a], [-a, -l]];
     var dpad = slab(roundedPoly(shift(cross, ox, oy), 0.04), 0.05, 0.025, mBlack); dpad.position.z = zF + 0.04; g.add(dpad);
     g.add(disc(0.045, 0.03, mGasket, ox, oy, zF + 0.09));
