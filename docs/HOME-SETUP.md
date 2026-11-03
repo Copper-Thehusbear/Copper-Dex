@@ -15,6 +15,9 @@ It starts Copper Dex, disables the stock launcher and the setup wizard (they bot
 
 Press Home on the remote, then restart the TV: it should boot straight into Copper Dex.
 
+## Updating the app later
+Builds are now signed with the key in `app/debug.keystore`, so a new build installs over the old one: run `tools/install-apk.sh <tv-ip> app-debug.apk` and do **not** uninstall first. (Uninstalling after Home has been switched would leave the TV with no Home until you install again.) The first build signed with this key still needs the old one uninstalled once, so do that before running `set-home.sh`.
+
 ## Optional: switch off apps you do not use
 ```
 tools/debloat.sh <tv-ip>            # uses tools/lists/tcl-g10.txt
