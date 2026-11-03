@@ -1,7 +1,8 @@
 plugins { id 'com.android.application' }
+def runNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '0').toInteger()
 android {
  namespace 'com.copper.dex'
  compileSdk 34
- defaultConfig { applicationId 'com.copper.dex'; minSdk 23; targetSdk 28; versionCode 4; versionName '0.4.0' }
+ defaultConfig { applicationId 'com.copper.dex'; minSdk 23; targetSdk 28; versionCode 100 + runNumber; versionName "0.4.${runNumber}" }
  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
