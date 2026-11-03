@@ -18,29 +18,42 @@
     if (ms) msgTimer = setTimeout(function () { msgEl.textContent = ''; msgEl.style.display = 'none'; }, ms);
   }
   if (!window.THREE) { msg('Could not load three.js'); return; }
+  /* Tuning options, "key=value,key=value": from the native side (am start ... --es opts "pr=1,fps=30") or the page URL.
+     tier, mat (phys|std|phong|basic), cc, shadow, env (0/1), aa, pr (pixel ratio), fps (cap), nodegrade, show (fps overlay) */
+  var O = {};
+  try {
+    String((BRIDGE && BRIDGE.opts && BRIDGE.opts()) || location.search.replace(/^\?/, '').split('&').join(',')).split(',').forEach(function (kv) {
+      var a = kv.split('='); if (a[0].trim()) O[a[0].trim()] = a[1] === undefined ? '1' : a[1].trim();
+    });
+  } catch (e) {}
   var renderer;
-  try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); }
+  try { renderer = new THREE.WebGLRenderer({ antialias: O.aa !== '0', alpha: true }); }
   catch (e) { msg('WebGL is not available on this device'); return; }
 
   /* Some TV GPU drivers (PowerVR) crash while compiling the full physical shaders, which kills the whole app.
      tier 0 = full look, 1 = no clearcoat or shadows, 2 = Phong without the environment map, 3 = unlit.
      The native side raises the tier by itself after a crash (see MainActivity.bootTier). */
   var tier = 0;
-  try { tier = BRIDGE && BRIDGE.bootTier ? (BRIDGE.bootTier() | 0) : (parseInt((location.search.match(/[?&]tier=(\d)/) || [])[1], 10) || 0); } catch (e) { tier = 0; }
+  try { tier = O.tier !== undefined ? (parseInt(O.tier, 10) || 0) : (BRIDGE && BRIDGE.bootTier ? (BRIDGE.bootTier() | 0) : 0); } catch (e) { tier = 0; }
   try {
     var gl = renderer.getContext(), dbg = gl.getExtension('WEBGL_debug_renderer_info');
     var gpuName = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : '';
-    if (tier < 1 && /powervr/i.test(gpuName)) tier = 1;
+    if (tier < 1 && O.tier === undefined && /powervr/i.test(gpuName)) tier = 1;
   } catch (e) {}
   tier = Math.max(0, Math.min(3, tier));
-  function liteMat(p) {
+  function flag(name, byTier) { return O[name] !== undefined ? O[name] === '1' : byTier; }
+  var useCC = flag('cc', tier === 0), useShadow = flag('shadow', tier === 0), useEnv = flag('env', tier < 2);
+  var matKind = O.mat || (tier === 0 ? 'phys' : tier === 1 ? 'std' : tier === 2 ? 'phong' : 'basic');
+  function makeMat(p, wantPhysical) {
     var q = {}, k;
     for (k in p) q[k] = p[k];
-    delete q.clearcoat; delete q.clearcoatRoughness; delete q.envMapIntensity;
-    if (tier === 1) return new THREE.MeshStandardMaterial(q);
+    if (!useCC || matKind !== 'phys') { delete q.clearcoat; delete q.clearcoatRoughness; }
+    if (!useEnv) delete q.envMapIntensity;
+    if (matKind === 'phys') return wantPhysical || useCC ? new THREE.MeshPhysicalMaterial(q) : new THREE.MeshStandardMaterial(q);
+    if (matKind === 'std') return new THREE.MeshStandardMaterial(q);
     var metal = q.metalness || 0, rough = q.roughness === undefined ? 0.5 : q.roughness;
-    delete q.metalness; delete q.roughness;
-    if (tier === 2) {
+    delete q.metalness; delete q.roughness; delete q.envMapIntensity;
+    if (matKind === 'phong') {
       q.shininess = Math.max(8, Math.min(160, 2 / (rough * rough + 0.01)));
       q.specular = new THREE.Color(0x222222).lerp(new THREE.Color(0x999999), metal);
       return new THREE.MeshPhongMaterial(q);
@@ -48,8 +61,8 @@
     delete q.emissive; delete q.emissiveIntensity;
     return new THREE.MeshBasicMaterial(q);
   }
-  function PhysMat(p) { return tier === 0 ? new THREE.MeshPhysicalMaterial(p) : liteMat(p); }
-  function StdMat(p) { return tier === 0 ? new THREE.MeshStandardMaterial(p) : liteMat(p); }
+  function PhysMat(p) { return makeMat(p, true); }
+  function StdMat(p) { return makeMat(p, false); }
   renderer.domElement.addEventListener('webglcontextlost', function (ev) {
     ev.preventDefault();
     if (tier < 3 && BRIDGE && BRIDGE.tierUp) { try { BRIDGE.tierUp(); } catch (e) {} }
@@ -60,11 +73,12 @@
   var F = '"Chakra Petch", system-ui, sans-serif';
   function C(hex) { return new THREE.Color(hex).convertSRGBToLinear(); }
 
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  var pixelRatio = O.pr ? parseFloat(O.pr) || 1 : (BRIDGE ? 1 : Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.setPixelRatio(pixelRatio);
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.LinearToneMapping;
   renderer.toneMappingExposure = 0.9;
-  renderer.shadowMap.enabled = tier === 0;
+  renderer.shadowMap.enabled = useShadow;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   stage.appendChild(renderer.domElement);
 
@@ -90,11 +104,11 @@
     pm.dispose();
     return tex;
   }
-  scene.environment = tier >= 2 ? null : buildEnv();
+  scene.environment = useEnv ? buildEnv() : null;
 
   var key = new THREE.DirectionalLight(0xffffff, 0.6);
   key.position.set(-5, 7, 8);
-  key.castShadow = tier === 0;
+  key.castShadow = useShadow;
   key.shadow.mapSize.set(2048, 2048);
   var sc = key.shadow.camera; sc.left = -8; sc.right = 8; sc.top = 8; sc.bottom = -8; sc.near = 1; sc.far = 30;
   key.shadow.bias = -0.0005;
@@ -743,7 +757,7 @@
   });
   var contact = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: contactTex, transparent: true, depthWrite: false }));
   contact.rotation.x = -Math.PI / 2; contact.position.y = GY + 0.003; contact.renderOrder = 3; scene.add(contact);
-  var ground = tier === 0 ? new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.ShadowMaterial({ opacity: 0.35 })) : new THREE.Group();
+  var ground = useShadow ? new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.ShadowMaterial({ opacity: 0.35 })) : new THREE.Group();
   ground.rotation.x = -Math.PI / 2; ground.position.y = GY + 0.004; ground.receiveShadow = true; ground.renderOrder = 4; scene.add(ground);
 
   /* ---------- state, animation ---------- */
@@ -794,7 +808,7 @@
     qLevel++;
     if (qLevel === 1) { R.pivot.visible = false; floor.visible = false; glow.visible = false; }
     else if (qLevel === 2) { key.castShadow = false; ground.visible = false; }
-    else if (qLevel === 3) { renderer.setPixelRatio(0.75); resize(); }
+    else if (qLevel === 3) { renderer.setPixelRatio(Math.min(pixelRatio, 0.75)); resize(); }
     try { console.log('CopperDex: reduced visual quality to level ' + qLevel); } catch (e) {}
   }
   function watchPerf(dt) {
@@ -818,8 +832,27 @@
   resize();
 
   var tmpV = new THREE.Vector3(), look = new THREE.Vector3(), launchPos = new THREE.Vector3(), launchLook = new THREE.Vector3(), wp = new THREE.Vector3(), dir = new THREE.Vector3();
-  var okFrames = 0;
+  var okFrames = 0, lastDraw = 0, capMs = O.fps !== undefined ? (parseFloat(O.fps) > 0 ? 1000 / parseFloat(O.fps) : 0) : (BRIDGE ? 1000 / 30 : 0);
+  var statN = 0, statT = 0, statEl = null;
+  if (O.show === '1') {
+    statEl = document.createElement('div');
+    statEl.style.cssText = 'position:fixed;left:8px;top:6px;z-index:9;color:#9ff;font:16px monospace;background:rgba(0,0,0,.55);padding:2px 6px';
+    document.body.appendChild(statEl);
+  }
+  function stats(now) {
+    statN++;
+    if (!statT) statT = now;
+    if (now - statT >= 2000) {
+      var fps = statN * 1000 / (now - statT);
+      statN = 0; statT = now;
+      var line = 'fps ' + fps.toFixed(1) + ' tier ' + tier + ' mat ' + matKind + ' cc ' + (+useCC) + ' sh ' + (+useShadow) + ' env ' + (+useEnv) + ' pr ' + pixelRatio + ' q ' + qLevel;
+      if (statEl) statEl.textContent = line;
+      try { console.log('CopperDex ' + line); } catch (e) {}
+    }
+  }
   function frame(now) {
+    if (capMs && now - lastDraw < capMs - 3) { requestAnimationFrame(frame); return; }
+    lastDraw = now;
     if (standby) { lastNow = now; requestAnimationFrame(frame); return; }
     var t = now / 1000;
     var dt = Math.min(0.1, Math.max(0, (now - lastNow) / 1000)); lastNow = now;
@@ -874,8 +907,9 @@
       ledMats[i3].emissiveIntensity = ledLevel[i3] * 1.2;
     }
     renderer.render(scene, camera);
+    stats(now);
     if (okFrames < 90 && ++okFrames === 90 && BRIDGE && BRIDGE.bootOk) { try { BRIDGE.bootOk(); } catch (e) {} }
-    watchPerf(dt);
+    if (O.nodegrade !== '1') watchPerf(dt);
     requestAnimationFrame(frame);
   }
   if (tier) msg('Graphics mode ' + tier, 4000);

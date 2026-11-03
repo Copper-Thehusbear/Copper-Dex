@@ -67,6 +67,12 @@ public class MainActivity extends Activity {
    sp.edit().putBoolean("booting",true).commit();
    return t;
   }
+  /* Tuning options string (see dex.js). Set with: adb shell am start -n com.copper.dex/.MainActivity --es opts "pr=1,fps=30,show=1"; clear with --es opts clear */
+  @JavascriptInterface public synchronized String opts(){
+   SharedPreferences sp=prefs(); String o=getIntent().getStringExtra("opts");
+   if(o!=null){ if(o.equals("clear"))o=""; sp.edit().putString("opts",o).commit(); }
+   return sp.getString("opts","");
+  }
   @JavascriptInterface public synchronized void bootOk(){ prefs().edit().putBoolean("booting",false).commit(); }
   @JavascriptInterface public synchronized int tierUp(){
    SharedPreferences sp=prefs(); int t=Math.min(MAX_TIER,sp.getInt("tier",0)+1);
