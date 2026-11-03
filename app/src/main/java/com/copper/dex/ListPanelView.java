@@ -131,11 +131,8 @@ final class ListPanelView extends DView {
   for (float y = 0; y < ph; y += 34) c.drawLine(0, y, pw, y, p);
   Paint br = Gfx.stroke(Design.alpha(Design.CYAN, 0.85f), 2f);
   Gfx.brackets(c, all, 12, 26, br);
-  for (int i = 0; i < 26; i++) c.drawText(String.valueOf((char) ('A' + i)), pw - 20, railY(i) + 5, letter);
   return b;
  }
-
- private float railY(int i) { return 104 + i * ((ph - 60 - 104) / 25f); }
 
  private void drawTabs(Canvas c) {
   float x = 26;
@@ -169,14 +166,6 @@ final class ListPanelView extends DView {
   idxSmall.setTextAlign(Paint.Align.RIGHT);
   c.drawText(small, sx, 50, idxSmall);
   c.drawText(big, sx - idxSmall.measureText(small) - 8, 52, idxBig);
-  char ch = items.get(sel).initial();
-  if (ch >= 'A' && ch <= 'Z') {
-   float y = railY(ch - 'A');
-   r.set(pw - 31, y - 10, pw - 9, y + 10);
-   fill.setColor(Design.CYAN);
-   c.drawRoundRect(r, 6, 6, fill);
-   c.drawText(String.valueOf(ch), pw - 20, y + 5, letterOn);
-  }
  }
 
  private void drawRows(Canvas c) {
@@ -211,7 +200,7 @@ final class ListPanelView extends DView {
   float top = v[0], h = v[1], a = v[2], ind = v[3];
   if (a < 0.02f) return;
   float k = Math.max(0f, 1f - Math.abs(d)) * (active ? 1f : 0.55f);   // how focused this row is
-  float left = 24 + ind, right = pw - 46;
+  float left = 24 + ind, right = pw - 28;
   r.set(left, top, right, top + h);
   // row background
   fill.setShader(new LinearGradient(left, 0, right, 0, Design.alpha(Design.lerp(0x0DFFFFFF, 0x4D288CFF, k), a),

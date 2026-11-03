@@ -13,7 +13,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   const page = await browser.newPage({ viewport: { width: W, height: H } });
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
-  const url = 'file://' + path.resolve(__dirname, 'shell-scene/index.html') + '?tier=1&debug=1&fps=0&pr=1&aa=1&nodegrade=1&lowmem=0&keys=' + (process.env.KEYS || '2') + (process.env.CAP ? '&cap=' + process.env.CAP : '');
+  const url = 'file://' + path.resolve(__dirname, 'shell-scene/index.html') + '?tier=1&debug=1&fps=0&pr=1&aa=1&nodegrade=1&lowmem=0&keys=' + (process.env.KEYS || '2') + (process.env.CAP ? '&cap=' + process.env.CAP : '') + (process.env.NOLENS ? '&nolens=1' : '');
   await page.goto(url);
   await page.waitForFunction(() => window.__dex, null, { timeout: 60000 });
   await page.evaluate(() => window.__dex.setTarget(1));

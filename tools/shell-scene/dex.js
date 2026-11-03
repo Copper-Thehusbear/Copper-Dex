@@ -589,6 +589,7 @@
     g.add(disc(rRing + 0.06, 0.04, mGasket, x, y, z + 0.02));
     g.add(disc(rRing, 0.07, mMetal, x, y, z + 0.035));
     g.add(disc(rRing - 0.05, 0.075, mGasket, x, y, z + 0.04));
+    if (O.nolens === '1') return;   /* render-only: leave the socket empty so the native app can show a picture in it */
     var dome = new THREE.Mesh(new THREE.SphereGeometry(rDome, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2), mLens);
     dome.rotation.x = Math.PI / 2; dome.scale.y = 0.6; dome.position.set(x, y, z + 0.07);
     dome.castShadow = true; g.add(dome);

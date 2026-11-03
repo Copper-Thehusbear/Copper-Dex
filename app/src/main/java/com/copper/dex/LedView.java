@@ -42,11 +42,18 @@ final class LedView extends DView {
 
  @Override void paintDesign(Canvas c) {
   long t = SystemClock.uptimeMillis() - t0;
-  float breath = 0.10f + 0.07f * (float) Math.sin(t / 1100.0);
-  float flash = t < 1400 ? (float) Math.pow(Math.max(0f, 1f - t / 800f), 2) * 0.65f : 0f;
-  float la = Math.min(0.85f, breath + flash);
-  p.setShader(new RadialGradient(140, 118, 150, Design.alpha(0xFF4C93FF, la), 0x004C93FF, Shader.TileMode.CLAMP));
-  c.drawCircle(140, 118, 150, p);
+  float breath = 0.5f + 0.5f * (float) Math.sin(t / 1100.0);
+  float flash = t < 1400 ? (float) Math.pow(Math.max(0f, 1f - t / 800f), 2) * 0.7f : 0f;
+  // soft halo just outside the lens ring
+  float ha = Math.min(0.9f, 0.14f + 0.14f * breath + flash * 0.5f);
+  p.setShader(new RadialGradient(140, 118, 138, new int[]{0x005CE1FF, 0x005CE1FF, Design.alpha(Design.CYAN, ha), 0x005CE1FF},
+    new float[]{0f, 0.77f, 0.84f, 1f}, Shader.TileMode.CLAMP));
+  c.drawCircle(140, 118, 138, p);
+  // power-on flash over the picture
+  if (flash > 0.01f) {
+   p.setShader(new RadialGradient(140, 118, 80, Design.alpha(0xFFFFFFFF, flash), 0x00FFFFFF, Shader.TileMode.CLAMP));
+   c.drawCircle(140, 118, 80, p);
+  }
   for (int i = 0; i < 3; i++) {
    float level = Math.max(0f, Math.min(1f, (t - ONSET[i]) / 220f));
    if (t >= next[i] + 180) next[i] = t + 1800 + rnd.nextInt(5200);
