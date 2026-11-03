@@ -644,8 +644,8 @@
     var shL = new THREE.Mesh(new THREE.PlaneGeometry(2.82, 1.56), mSheenL);
     shL.position.set(0, 0.1, zF + 0.168); g.add(shL);
     /* date and time: a quadrilateral with one sharp corner, sitting in the red wedge right on the ivory edge */
-    var q = [[-0.15, 1.10], [1.67, 1.10], [1.67, 1.51], [0.55, 1.51]];
-    var ck = slab(roundedPoly(inflate(q, 0.03), [0.0001, 0.02, 0.02, 0.02]), 0.02, 0.012, mGasket);
+    var q = [[0.22, 1.17], [1.67, 1.17], [1.67, 1.51], [0.62, 1.51], [0.10, 1.25]];
+    var ck = slab(roundedPoly(inflate(q, 0.03), [0.05, 0.02, 0.02, 0.02, 0.05]), 0.02, 0.012, mGasket);
     ck.position.z = zF + 0.07; g.add(ck);
     var cd = polyMesh(q, mScreenC); cd.position.z = zF + 0.1; g.add(cd);
     var cgl = polyMesh(q, mGlass); cgl.position.z = zF + 0.105; g.add(cgl);
@@ -691,11 +691,17 @@
     glass.position.set(0, 0.42, zF + 0.133); g.add(glass);
     var shR = new THREE.Mesh(new THREE.PlaneGeometry(2.96, 2.77), mSheenR);
     shR.position.set(0, 0.42, zF + 0.138); g.add(shR);
-    var panel = slab(roundedPoly(rectPts(3.1, 0.8, 0, -1.58), 0.16), 0.03, 0.02, mGasket);
-    panel.position.z = zF + 0.02; g.add(panel);
+    if (O.keys !== '2') {
+      var panel = slab(roundedPoly(rectPts(3.1, 0.8, 0, -1.58), 0.16), 0.03, 0.02, mGasket);
+      panel.position.z = zF + 0.02; g.add(panel);
+    }
     var xs = [-1.25, -0.75, -0.25, 0.25, 0.75, 1.25], rings = [];
     for (var i = 0; i < 6; i++) {
-      if (O.keys === '1') {   /* render-only: raised keys like the D-pad, for the native launcher's body image */
+      if (O.keys === '2') {   /* render-only: coloured jelly caps seated in black rims, straight on the red shell */
+        var capCol = [0xffc21a, 0x22c55e, 0x3b82f6, 0x14c8d4, 0xa855f7, 0xef4444][i];
+        var rim = slab(roundedPoly(rectPts(0.5, 0.5, xs[i], -1.5), 0.16), 0.03, 0.015, mGasket); rim.position.z = zF + 0.0; g.add(rim);
+        var cap = slab(roundedPoly(rectPts(0.4, 0.4, xs[i], -1.5), 0.13), 0.075, 0.032, new StdMat({ color: C(capCol), roughness: 0.28, metalness: 0.02 })); cap.position.z = zF + 0.03; g.add(cap);
+      } else if (O.keys === '1') {   /* render-only: raised keys like the D-pad, for the native launcher's body image */
         var keyMesh = slab(roundedPoly(rectPts(0.4, 0.4, xs[i], -1.5), 0.085), 0.07, 0.03, mBlack); keyMesh.position.z = zF + 0.035; g.add(keyMesh);
       } else {
       g.add(ring(0.165, 0.016, mMetal, xs[i], -1.5, zF + 0.07));
