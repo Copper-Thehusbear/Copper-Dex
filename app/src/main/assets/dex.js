@@ -26,8 +26,12 @@
       var a = kv.split('='); if (a[0].trim()) O[a[0].trim()] = a[1] === undefined ? '1' : a[1].trim();
     });
   } catch (e) {}
+  /* The TV's GPU runs out of memory (GL_OUT_OF_MEMORY, then the driver aborts), so the native app starts in a low-memory profile:
+     screen textures at half size, no mipmaps or anisotropy, no multisampling. lowmem=0 / tk=1 / aa=1 turn parts of it back off. */
+  var lowmem = O.lowmem !== undefined ? O.lowmem === '1' : !!BRIDGE;
+  var TK = O.tk ? parseFloat(O.tk) || 1 : (lowmem ? 0.5 : 1);
   var renderer;
-  try { renderer = new THREE.WebGLRenderer({ antialias: O.aa !== '0', alpha: true }); }
+  try { renderer = new THREE.WebGLRenderer({ antialias: O.aa !== undefined ? O.aa === '1' : !lowmem, alpha: true }); }
   catch (e) { msg('WebGL is not available on this device'); return; }
 
   /* Some TV GPU drivers (PowerVR) crash while compiling the full physical shaders, which kills the whole app.
@@ -272,15 +276,19 @@
     ctx.fillText(text, x, y);
   }
   var buttons = ['Settings', 'Network', 'Inputs', 'Live TV', 'Voice', 'Power'];
-  var cL = document.createElement('canvas'); cL.width = 1456; cL.height = 800;
-  var cR = document.createElement('canvas'); cR.width = 940; cR.height = 880;
-  var cC = document.createElement('canvas'); cC.width = 1120; cC.height = 256;
+  var cL = document.createElement('canvas'); cL.width = Math.round(1456 * TK); cL.height = Math.round(800 * TK);
+  var cR = document.createElement('canvas'); cR.width = Math.round(940 * TK); cR.height = Math.round(880 * TK);
+  var cC = document.createElement('canvas'); cC.width = Math.round(1120 * TK); cC.height = Math.round(256 * TK);
   var cN = document.createElement('canvas'); cN.width = 480; cN.height = 120;
+  function slim(t) {
+    if (lowmem) { t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; t.anisotropy = 1; }
+    return t;
+  }
   function mkTex(c) {
     var t = new THREE.CanvasTexture(c);
     t.encoding = THREE.sRGBEncoding;
     t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-    return t;
+    return slim(t);
   }
   var tL = mkTex(cL), tR = mkTex(cR), tC = mkTex(cC), tN = mkTex(cN);
 
@@ -308,6 +316,7 @@
   }
   function drawLeft() {
     var ctx = cL.getContext('2d'), a = apps[focus];
+    ctx.setTransform(TK, 0, 0, TK, 0, 0);
     screenBase(ctx, 1456, 800, true);
     if (!a) { tL.needsUpdate = true; return; }
     ensureHero(a);
@@ -334,6 +343,7 @@
   }
   function drawRight() {
     var ctx = cR.getContext('2d');
+    ctx.setTransform(TK, 0, 0, TK, 0, 0);
     screenBase(ctx, 940, 880, false);
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.fillStyle = '#e8f6fb'; ctx.font = '700 48px ' + F; ctx.fillText('Apps', 34, 48);
@@ -378,6 +388,7 @@
   }
   function drawClock() {
     var ctx = cC.getContext('2d');
+    ctx.setTransform(TK, 0, 0, TK, 0, 0);
     var g = ctx.createLinearGradient(0, 0, 1120, 256);
     g.addColorStop(0, '#10305a'); g.addColorStop(1, '#050d1e');
     ctx.fillStyle = g; ctx.fillRect(0, 0, 1120, 256);
@@ -419,7 +430,7 @@
     ctx.font = '600 38px ' + F; ctx.fillText(label, 100, 238);
     var t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding;
     t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-    return t;
+    return slim(t);
   }
   var btnMats = buttons.map(function (b) { return new THREE.MeshBasicMaterial({ map: mkBtnTex(b), transparent: true, toneMapped: false, depthWrite: false }); });
   function drawAll() { drawLeft(); drawRight(); drawClock(); drawName(); }
@@ -457,10 +468,10 @@
     x.strokeStyle = 'rgba(255,255,255,0.28)'; x.lineWidth = 3;
     rrect(x, 3, 3, w - 6, h - 6, Math.min(w, h) * 0.03); x.stroke();
     var t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding;
-    return t;
+    return slim(t);
   }
-  var mSheenL = new THREE.MeshBasicMaterial({ map: makeSheen(1024, 563), transparent: true, depthWrite: false, toneMapped: false });
-  var mSheenR = new THREE.MeshBasicMaterial({ map: makeSheen(1024, 958), transparent: true, depthWrite: false, toneMapped: false });
+  var mSheenL = new THREE.MeshBasicMaterial({ map: makeSheen(lowmem ? 256 : 1024, lowmem ? 141 : 563), transparent: true, depthWrite: false, toneMapped: false });
+  var mSheenR = new THREE.MeshBasicMaterial({ map: makeSheen(lowmem ? 256 : 1024, lowmem ? 240 : 958), transparent: true, depthWrite: false, toneMapped: false });
 
   /* ---------- real 3D lettering: trace the glyph mask, then extrude the outlines ---------- */
   var SEG = { 1: ['T', 'L'], 2: ['R', 'T'], 3: ['R', 'L'], 4: ['B', 'R'], 6: ['B', 'T'], 7: ['B', 'L'], 8: ['L', 'B'], 9: ['T', 'B'], 11: ['R', 'B'], 12: ['L', 'R'], 13: ['T', 'R'], 14: ['L', 'T'] };
@@ -852,7 +863,7 @@
     if (now - statT >= 2000) {
       var fps = statN * 1000 / (now - statT);
       statN = 0; statT = now;
-      var line = 'fps ' + fps.toFixed(1) + ' tier ' + tier + ' mat ' + matKind + ' cc ' + (+useCC) + ' sh ' + (+useShadow) + ' env ' + (+useEnv) + ' pr ' + pixelRatio + ' q ' + qLevel;
+      var mem = renderer.info.memory, line = 'tex ' + mem.textures + ' geo ' + mem.geometries + ' fps ' + fps.toFixed(1) + ' tier ' + tier + ' mat ' + matKind + ' cc ' + (+useCC) + ' sh ' + (+useShadow) + ' env ' + (+useEnv) + ' pr ' + pixelRatio + ' q ' + qLevel;
       if (statEl) statEl.textContent = line;
       try { console.log('CopperDex ' + line); } catch (e) {}
     }
