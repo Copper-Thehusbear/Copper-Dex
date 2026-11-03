@@ -1,160 +1,249 @@
 package com.copper.dex;
 
 import android.app.Activity;
-import android.os.Bundle;
 import android.content.Intent;
-import android.content.SharedPreferences;
-import android.webkit.WebResourceRequest;
 import android.graphics.Color;
-import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.drawable.Drawable;
-import android.media.tv.TvContract;
-import android.net.Uri;
+import android.graphics.drawable.ColorDrawable;
+import android.os.Bundle;
 import android.provider.Settings;
-import android.util.Base64;
-import android.webkit.JavascriptInterface;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.view.KeyEvent;
 import android.view.View;
-import org.json.JSONArray;
-import org.json.JSONObject;
-import java.io.ByteArrayOutputStream;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import android.widget.Toast;
 
+import java.util.ArrayList;
+import java.util.List;
+
+/** Copper Dex: a Pokédex-styled home screen. All drawing is native; see the *View classes. */
 public class MainActivity extends Activity {
- private WebView web;
- @Override public void onCreate(Bundle state) {
+ private static final int LIST = 0, KEYS = 1;
+
+ private AppRepo repo;
+ private ArtLoader loader;
+ private ShellView shell;
+ private HeroView hero;
+ private ListPanelView list;
+ private KeysView keys;
+ private StandbyView standby;
+ private View fade;
+
+ private int tab = 0, zone = LIST, keyFocus = 2;
+ private final int[] selTab = new int[3];
+ private List<AppEntry> current = new ArrayList<>();
+ private boolean resumedOnce;
+
+ private final Runnable redraw = new Runnable() {
+  @Override public void run() {
+   list.invalidate();
+   hero.invalidate();
+  }
+ };
+
+ @Override protected void onCreate(Bundle state) {
   super.onCreate(state);
-  if(getIntent().hasExtra("tier"))prefs().edit().putBoolean("forcedUsed",false).commit();
-  getWindow().getDecorView().setSystemUiVisibility(5894 | View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
-  web=new WebView(this);
-  web.getSettings().setJavaScriptEnabled(true);
-  web.getSettings().setAllowFileAccess(false);
-  web.getSettings().setAllowContentAccess(false);
-  web.getSettings().setDomStorageEnabled(false);
-  web.setBackgroundColor(Color.BLACK);
-  web.setWebViewClient(new WebViewClient(){@Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request){return true;}});
-  web.addJavascriptInterface(new Bridge(),"CopperDex");
-  setContentView(web);
-  web.loadUrl("file:///android_asset/index.html");
+  Design.load(this);
+  getWindow().setBackgroundDrawable(new ColorDrawable(Color.BLACK));
+  immersive();
+
+  repo = new AppRepo(this);
+  loader = new ArtLoader(this);
+  repo.load();
+
+  StageLayout stage = new StageLayout(this);
+  shell = new ShellView(this);
+  hero = new HeroView(this);
+  list = new ListPanelView(this);
+  keys = new KeysView(this);
+  standby = new StandbyView(this);
+  stage.addView(shell);
+  stage.addView(new LedView(this));
+  stage.addView(hero);
+  stage.addView(new ClockView(this));
+  stage.addView(list);
+  stage.addView(keys);
+  stage.addView(standby);
+  fade = new View(this);
+  fade.setBackgroundColor(Color.BLACK);
+  fade.setAlpha(0f);
+  stage.addView(fade);
+  setContentView(stage);
+
+  list.setFavs(new ListPanelView.Favs() {
+   @Override public boolean isFav(AppEntry e) { return repo.isFav(e); }
+  });
+  showTab(0);
  }
- @Override public boolean onKeyDown(int key, KeyEvent event) {
-  String direction=null;
-  if(key==KeyEvent.KEYCODE_DPAD_LEFT) direction="left";
-  if(key==KeyEvent.KEYCODE_DPAD_RIGHT) direction="right";
-  if(key==KeyEvent.KEYCODE_DPAD_UP) direction="up";
-  if(key==KeyEvent.KEYCODE_DPAD_DOWN) direction="down";
-  if(key==KeyEvent.KEYCODE_DPAD_CENTER || key==KeyEvent.KEYCODE_ENTER) direction="ok";
-  if(direction!=null){ final String val=direction; web.evaluateJavascript("window.copperKey&&window.copperKey('"+val+"')",null);return true; }
-  return super.onKeyDown(key,event);
+
+ private void immersive() {
+  getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN
+    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
  }
- private static final int MAX_TIER=3;
- private SharedPreferences prefs(){return getSharedPreferences("copper",MODE_PRIVATE);}
- private final class Bridge {
-  /* Graphics tier: raised by one after a launch that never reached a stable frame (the TV's GPU driver crashed).
-     Force one for testing with: adb shell am start -n com.copper.dex/.MainActivity --ei tier 2 */
-  @JavascriptInterface public synchronized int bootTier(){
-   SharedPreferences sp=prefs(); int forced=getIntent().getIntExtra("tier",-1);
-   int t=sp.getInt("tier",0);
-   if(forced>=0&&!sp.getBoolean("forcedUsed",false)){ t=Math.min(MAX_TIER,forced); sp.edit().putInt("tier",t).putBoolean("forcedUsed",true).putBoolean("booting",true).commit(); return t; }
-   if(sp.getBoolean("booting",false)||sp.getBoolean("opening",false)){ t=Math.min(MAX_TIER,t+1); sp.edit().putInt("tier",t).putBoolean("opening",false).commit(); }
-   sp.edit().putBoolean("booting",true).commit();
-   return t;
-  }
-  /* Tuning options string (see dex.js). Set with: adb shell am start -n com.copper.dex/.MainActivity --es opts "pr=1,fps=30,show=1"; clear with --es opts clear */
-  @JavascriptInterface public synchronized String opts(){
-   SharedPreferences sp=prefs(); String o=getIntent().getStringExtra("opts");
-   if(o!=null){ if(o.equals("clear"))o=""; sp.edit().putString("opts",o).commit(); }
-   return sp.getString("opts","");
-  }
-  /* mark("opening") before the flap opens, mark("openOk") once it has rendered stably; a launch that dies in between raises the tier */
-  @JavascriptInterface public synchronized void mark(String what){ prefs().edit().putBoolean("opening","opening".equals(what)).commit(); }
-  @JavascriptInterface public synchronized void bootOk(){ prefs().edit().putBoolean("booting",false).commit(); }
-  @JavascriptInterface public synchronized int tierUp(){
-   SharedPreferences sp=prefs(); int t=Math.min(MAX_TIER,sp.getInt("tier",0)+1);
-   sp.edit().putInt("tier",t).putBoolean("booting",false).commit();
-   runOnUiThread(()->web.loadUrl("file:///android_asset/index.html"));
-   return t;
-  }
-  @JavascriptInterface public String apps(){
-   JSONArray out=new JSONArray(); PackageManager pm=getPackageManager();
-   Set<String> seen=new HashSet<>();
-   for(String cat:new String[]{Intent.CATEGORY_LEANBACK_LAUNCHER,Intent.CATEGORY_LAUNCHER}){
-    Intent query=new Intent(Intent.ACTION_MAIN).addCategory(cat);
-    List<ResolveInfo> all=pm.queryIntentActivities(query,0);
-    for(ResolveInfo item:all)try{
-     String pkg=item.activityInfo.packageName;
-     if(pkg.equals(getPackageName()) || !seen.add(pkg))continue;
-     JSONObject app=new JSONObject();
-     app.put("pkg",pkg); app.put("name",item.loadLabel(pm).toString());
-     Drawable icon=item.loadIcon(pm); Bitmap bitmap=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888);
-     Canvas canvas=new Canvas(bitmap); icon.setBounds(0,0,96,96); icon.draw(canvas);
-     ByteArrayOutputStream stream=new ByteArrayOutputStream(); bitmap.compress(Bitmap.CompressFormat.PNG,90,stream);
-     app.put("icon","data:image/png;base64,"+Base64.encodeToString(stream.toByteArray(),Base64.NO_WRAP));
-     out.put(app);
-    }catch(Exception ignored){}
-   }
-   return out.toString();
-  }
-  @JavascriptInterface public void open(String pkg){
-   runOnUiThread(()->{
-    try{
-     PackageManager pm=getPackageManager();
-     Intent intent=pm.getLeanbackLaunchIntentForPackage(pkg);
-     if(intent==null)intent=pm.getLaunchIntentForPackage(pkg);
-     if(intent!=null)startActivity(intent);
-    }catch(Exception ignored){}
-   });
-  }
-  @JavascriptInterface public String banner(String pkg){
-   try{
-    PackageManager pm=getPackageManager();
-    Drawable d=null;
-    Intent launch=pm.getLeanbackLaunchIntentForPackage(pkg);
-    if(launch!=null) d=pm.getActivityBanner(launch);
-    if(d==null) d=pm.getApplicationBanner(pkg);
-    if(d==null) return "";
-    Bitmap bitmap=Bitmap.createBitmap(320,180,Bitmap.Config.ARGB_8888);
-    Canvas canvas=new Canvas(bitmap); d.setBounds(0,0,320,180); d.draw(canvas);
-    ByteArrayOutputStream stream=new ByteArrayOutputStream(); bitmap.compress(Bitmap.CompressFormat.PNG,90,stream);
-    return "data:image/png;base64,"+Base64.encodeToString(stream.toByteArray(),Base64.NO_WRAP);
-   }catch(Exception e){ return ""; }
-  }
-  @JavascriptInterface public void tv(){runOnUiThread(()->{
-   PackageManager pm=getPackageManager();
-   try{
-    Intent live=new Intent(Intent.ACTION_VIEW,TvContract.Channels.CONTENT_URI);
-    if(live.resolveActivity(pm)!=null){ startActivity(live); return; }
-   }catch(Exception ignored){}
-   for(String pkg:new String[]{"com.google.android.tv","com.tcl.tv","com.tcl.livetv"}){
-    try{
-     Intent in=pm.getLeanbackLaunchIntentForPackage(pkg);
-     if(in==null)in=pm.getLaunchIntentForPackage(pkg);
-     if(in!=null){ startActivity(in); return; }
-    }catch(Exception ignored){}
-   }
-   try{ startActivity(new Intent("android.settings.TV_INPUT_SETTINGS")); }
-   catch(Exception ignored){ startActivity(new Intent(Settings.ACTION_SETTINGS)); }
-  });}
-  @JavascriptInterface public void voice(){runOnUiThread(()->{
-   try{ startActivity(new Intent(Intent.ACTION_VOICE_COMMAND).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); }
-   catch(Exception first){
-    try{ startActivity(new Intent(Intent.ACTION_ASSIST).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); }catch(Exception ignored){}
-   }
-  });}
- @JavascriptInterface public void settings(){runOnUiThread(()->startActivity(new Intent(Settings.ACTION_SETTINGS)));}
-  @JavascriptInterface public void wifi(){runOnUiThread(()->startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)));}
-  @JavascriptInterface public void inputs(){runOnUiThread(()->{
-   try{ startActivity(new Intent("android.settings.TV_INPUT_SETTINGS")); }
-   catch(Exception ignored){startActivity(new Intent(Settings.ACTION_SETTINGS));}
-  });}
+
+ @Override protected void onResume() {
+  super.onResume();
+  immersive();
+  if (resumedOnce && repo.load()) showTab(tab);
+  resumedOnce = true;
+  fade.animate().alpha(0f).setDuration(220).start();
  }
- @Override protected void onResume(){super.onResume();if(web!=null)web.evaluateJavascript("window.copperResume&&window.copperResume()",null);}
- @Override public void onBackPressed(){web.evaluateJavascript("window.copperBack&&window.copperBack()",null);}
+
+ @Override protected void onNewIntent(Intent intent) {
+  super.onNewIntent(intent);          // Home pressed while we are showing
+  if (standby.isShown2()) standby.setShown(false);
+  setZone(LIST);
+  if (tab != 0) showTab(0);
+  select(0);
+ }
+
+ // ---- state ----
+
+ private void showTab(int t) {
+  tab = t;
+  current = t == 0 ? repo.apps : t == 1 ? repo.favourites() : repo.inputs;
+  selTab[t] = Math.max(0, Math.min(selTab[t], Math.max(0, current.size() - 1)));
+  list.setCounts(repo.apps.size(), repo.favourites().size(), repo.inputs.size());
+  list.setItems(current, t, selTab[t]);
+  updateHero(false);
+  preload();
+ }
+
+ private void select(int i) {
+  if (current.isEmpty()) return;
+  i = Math.max(0, Math.min(i, current.size() - 1));
+  selTab[tab] = i;
+  list.setSelected(i);
+  updateHero(true);
+  preload();
+ }
+
+ private void updateHero(boolean animate) {
+  hero.setEntry(current.isEmpty() ? null : current.get(selTab[tab]), animate);
+ }
+
+ private void preload() {
+  int s = selTab[tab];
+  for (int i = Math.max(0, s - 5); i <= Math.min(current.size() - 1, s + 5); i++) loader.ensure(current.get(i), redraw);
+ }
+
+ private void setZone(int z) {
+  zone = z;
+  list.setActive(z == LIST);
+  keys.setFocus(z == KEYS ? keyFocus : -1);
+ }
+
+ // ---- remote ----
+
+ @Override public boolean onKeyDown(int code, KeyEvent e) {
+  if (standby.isShown2()) {
+   standby.setShown(false);
+   return true;
+  }
+  int sel = selTab[tab], n = current.size();
+  switch (code) {
+   case KeyEvent.KEYCODE_DPAD_UP:
+    if (zone == LIST) { if (sel > 0) select(sel - 1); else setZone(KEYS); } else setZone(LIST);
+    return true;
+   case KeyEvent.KEYCODE_DPAD_DOWN:
+    if (zone == LIST) { if (sel < n - 1) select(sel + 1); else setZone(KEYS); }
+    return true;
+   case KeyEvent.KEYCODE_DPAD_LEFT:
+    if (zone == LIST) showTab((tab + 2) % 3); else { keyFocus = Math.max(0, keyFocus - 1); setZone(KEYS); }
+    return true;
+   case KeyEvent.KEYCODE_DPAD_RIGHT:
+    if (zone == LIST) showTab((tab + 1) % 3); else { keyFocus = Math.min(5, keyFocus + 1); setZone(KEYS); }
+    return true;
+   case KeyEvent.KEYCODE_DPAD_CENTER:
+   case KeyEvent.KEYCODE_ENTER:
+   case KeyEvent.KEYCODE_NUMPAD_ENTER:
+    if (e.getRepeatCount() == 0) e.startTracking();
+    return true;
+   case KeyEvent.KEYCODE_BACK:
+    return true;
+   default:
+    return super.onKeyDown(code, e);
+  }
+ }
+
+ @Override public boolean onKeyLongPress(int code, KeyEvent e) {
+  if (code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+   if (zone == LIST && !current.isEmpty()) {
+    AppEntry en = current.get(selTab[tab]);
+    if (en.type == AppEntry.APP) {
+     repo.toggleFav(en);
+     list.setCounts(repo.apps.size(), repo.favourites().size(), repo.inputs.size());
+     if (tab == 1) showTab(1); else list.invalidate();
+     Toast.makeText(this, repo.isFav(en) ? en.label + " added to favourites" : en.label + " removed from favourites", Toast.LENGTH_SHORT).show();
+    }
+   }
+   return true;
+  }
+  return super.onKeyLongPress(code, e);
+ }
+
+ @Override public boolean onKeyUp(int code, KeyEvent e) {
+  if (code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+   if (!e.isCanceled()) activate();
+   return true;
+  }
+  if (code == KeyEvent.KEYCODE_BACK) {
+   onBack();
+   return true;
+  }
+  return super.onKeyUp(code, e);
+ }
+
+ @Override public void onBackPressed() {
+  onBack();
+ }
+
+ private void onBack() {
+  if (standby.isShown2()) { standby.setShown(false); return; }
+  if (zone == KEYS) { setZone(LIST); return; }
+  if (tab != 0) showTab(0);
+ }
+
+ private void activate() {
+  if (zone == KEYS) { doKey(keyFocus); return; }
+  if (current.isEmpty()) return;
+  launch(current.get(selTab[tab]));
+ }
+
+ private void doKey(int i) {
+  switch (i) {
+   case 0: go(new Intent(Settings.ACTION_SETTINGS)); break;
+   case 1: go(new Intent(Settings.ACTION_WIFI_SETTINGS)); break;
+   case 2: setZone(LIST); showTab(2); break;
+   case 3:
+    for (AppEntry e : repo.inputs) if (e.pkg.equals("live")) { launch(e); return; }
+    go(new Intent("android.settings.TV_INPUT_SETTINGS"));
+    break;
+   case 4:
+    try { startActivity(new Intent(Intent.ACTION_VOICE_COMMAND).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); }
+    catch (Exception first) { go(new Intent(Intent.ACTION_ASSIST).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); }
+    break;
+   default: standby.setShown(true); break;
+  }
+ }
+
+ private void go(Intent in) {
+  try {
+   startActivity(in);
+  } catch (Exception e) {
+   Toast.makeText(this, "Not available on this TV", Toast.LENGTH_SHORT).show();
+  }
+ }
+
+ private void launch(final AppEntry e) {
+  if (e.launch == null) return;
+  fade.animate().alpha(1f).setDuration(140).withEndAction(new Runnable() {
+   @Override public void run() {
+    try {
+     startActivity(e.launch);
+    } catch (Exception ex) {
+     fade.animate().alpha(0f).setDuration(200).start();
+     Toast.makeText(MainActivity.this, "Could not open " + e.label, Toast.LENGTH_SHORT).show();
+    }
+   }
+  }).start();
+ }
 }
