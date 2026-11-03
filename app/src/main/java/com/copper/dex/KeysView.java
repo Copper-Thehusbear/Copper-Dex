@@ -13,7 +13,7 @@ final class KeysView extends DView {
  private final Paint icon = Gfx.stroke(0xFFE9EFF4, 1f);
  private final Paint iconFill = Gfx.fill(0xFFE9EFF4);
  private final Paint glow = Gfx.stroke(Design.alpha(0xFFBEE6FF, 0.35f), 1f);
- private final Paint label = Gfx.text(Design.semi, 14, 0xFFFDE8E4, 0.18f);
+ private final Paint label = Gfx.text(Design.semi, 20, 0xFFFFF0EC, 0.08f);
  private final Paint ring = Gfx.stroke(Design.CYAN, 3f);
  private final Paint ringGlow = Gfx.stroke(Design.alpha(Design.CYAN, 0.28f), 9f);
  private final RectF tmp = new RectF();
@@ -22,7 +22,7 @@ final class KeysView extends DView {
  KeysView(Context c) {
   super(c, Design.KEYS);
   label.setTextAlign(Paint.Align.CENTER);
-  label.setShadowLayer(1.5f, 0, 1.5f, 0x8C780000);
+  label.setShadowLayer(2f, 0, 2f, 0x99780000);
  }
 
  void setFocus(int i) {
@@ -41,7 +41,7 @@ final class KeysView extends DView {
     c.drawRoundRect(tmp, 26, 26, ring);
    }
    drawIcon(c, i, cx, cy, 46);
-   c.drawText(LABELS[i].toUpperCase(), cx, 1020, label);
+   c.drawText(LABELS[i].toUpperCase(), cx, 1026, label);
   }
  }
 

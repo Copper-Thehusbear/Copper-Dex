@@ -38,15 +38,15 @@ final class ListPanelView extends DView {
  private final float pw = Design.RIGHT.width(), ph = Design.RIGHT.height();
 
  private final Paint fill = Gfx.fill(0), line = Gfx.stroke(0, 1.5f), art = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
- private final Paint num = Gfx.text(Design.light, 16, 0, 0.1f);
+ private final Paint num = Gfx.text(Design.light, 18, 0, 0.1f);
  private final Paint name = Gfx.text(Design.light, 30, 0, -0.01f);
- private final Paint cat = Gfx.text(Design.medium, 10, 0, 0.4f);
- private final Paint tabP = Gfx.text(Design.medium, 13, 0, 0.23f);
- private final Paint badge = Gfx.text(Design.medium, 11, 0, 0.08f);
- private final Paint idxBig = Gfx.text(Design.light, 26, 0xFFE9F6FF, 0f);
- private final Paint idxSmall = Gfx.text(Design.medium, 13, Design.GRAY, 0.15f);
- private final Paint letter = Gfx.text(Design.medium, 11, 0xFF4B6073, 0f);
- private final Paint letterOn = Gfx.text(Design.semi, 11, 0xFF04101C, 0f);
+ private final Paint cat = Gfx.text(Design.medium, 12, 0, 0.28f);
+ private final Paint tabP = Gfx.text(Design.semi, 19, 0, 0.1f);
+ private final Paint badge = Gfx.text(Design.semi, 14, 0, 0.04f);
+ private final Paint idxBig = Gfx.text(Design.light, 32, 0xFFE9F6FF, 0f);
+ private final Paint idxSmall = Gfx.text(Design.medium, 16, Design.GRAY, 0.1f);
+ private final Paint letter = Gfx.text(Design.medium, 14, 0xFF5A7085, 0f);
+ private final Paint letterOn = Gfx.text(Design.semi, 14, 0xFF04101C, 0f);
  private final Paint glyph = Gfx.text(Design.semi, 20, 0xFFFFFFFF, 0f);
  private final Paint hintP = Gfx.text(Design.regular, 18, Design.GRAY, 0.02f);
  private final Paint fade = new Paint();
@@ -131,31 +131,33 @@ final class ListPanelView extends DView {
   for (float y = 0; y < ph; y += 34) c.drawLine(0, y, pw, y, p);
   Paint br = Gfx.stroke(Design.alpha(Design.CYAN, 0.85f), 2f);
   Gfx.brackets(c, all, 12, 26, br);
-  for (int i = 0; i < 26; i++) c.drawText(String.valueOf((char) ('A' + i)), pw - 20, railY(i) + 4, letter);
+  for (int i = 0; i < 26; i++) c.drawText(String.valueOf((char) ('A' + i)), pw - 20, railY(i) + 5, letter);
   return b;
  }
 
  private float railY(int i) { return 104 + i * ((ph - 60 - 104) / 25f); }
 
  private void drawTabs(Canvas c) {
-  float x = 30;
+  float x = 26;
   for (int i = 0; i < 3; i++) {
    boolean on = i == tab;
-   tabP.setColor(on ? 0xFFFFFFFF : Design.GRAY);
+   tabP.setColor(on ? 0xFFFFFFFF : 0xFF8FA6B8);
    float tw = tabP.measureText(TABS[i]);
    String cn = String.valueOf(counts[i]);
-   badge.setColor(on ? Design.CYAN : 0xFF9FB4C6);
-   float bw = badge.measureText(cn) + 12;
-   c.drawText(TABS[i], x + 14, 47, tabP);
-   fill.setColor(on ? Design.alpha(Design.CYAN, 0.18f) : 0x14FFFFFF);
-   r.set(x + 14 + tw + 8, 33, x + 14 + tw + 8 + bw, 51);
-   c.drawRoundRect(r, 8, 8, fill);
-   c.drawText(cn, r.left + 6, 46, badge);
+   badge.setColor(on ? Design.CYAN : 0xFFB5C6D4);
+   float bw = badge.measureText(cn) + 14;
+   float cx0 = x + 12;
+   c.drawText(TABS[i], cx0, 50, tabP);
+   fill.setColor(on ? Design.alpha(Design.CYAN, 0.20f) : 0x1AFFFFFF);
+   r.set(cx0 + tw + 8, 32, cx0 + tw + 8 + bw, 56);
+   c.drawRoundRect(r, 9, 9, fill);
+   c.drawText(cn, r.left + 7, 50, badge);
+   float end = r.right + 12;
    if (on) {
     fill.setColor(Design.CYAN);
-    c.drawRect(x, 58, x + 28 + tw + 8 + bw, 60, fill);
+    c.drawRect(x, 63, end, 65.5f, fill);
    }
-   x += 28 + tw + 8 + bw + 10;
+   x = end + 8;
   }
  }
 
@@ -165,15 +167,15 @@ final class ListPanelView extends DView {
   float sx = pw - 34;
   String small = "/ " + String.format(java.util.Locale.ENGLISH, "%03d", items.size());
   idxSmall.setTextAlign(Paint.Align.RIGHT);
-  c.drawText(small, sx, 46, idxSmall);
-  c.drawText(big, sx - idxSmall.measureText(small) - 8, 48, idxBig);
+  c.drawText(small, sx, 50, idxSmall);
+  c.drawText(big, sx - idxSmall.measureText(small) - 8, 52, idxBig);
   char ch = items.get(sel).initial();
   if (ch >= 'A' && ch <= 'Z') {
    float y = railY(ch - 'A');
-   r.set(pw - 29, y - 8, pw - 11, y + 8);
+   r.set(pw - 31, y - 10, pw - 9, y + 10);
    fill.setColor(Design.CYAN);
    c.drawRoundRect(r, 6, 6, fill);
-   c.drawText(String.valueOf(ch), pw - 20, y + 4, letterOn);
+   c.drawText(String.valueOf(ch), pw - 20, y + 5, letterOn);
   }
  }
 
@@ -226,7 +228,7 @@ final class ListPanelView extends DView {
   }
   // number
   num.setTypeface(k > 0.5f ? Design.medium : Design.light);
-  num.setTextSize(Design.lerp(16f, 22f, k));
+  num.setTextSize(Design.lerp(18f, 26f, k));
   num.setColor(Design.alpha(Design.lerp(Design.DIM, Design.CYAN, k), a));
   c.drawText(String.format(java.util.Locale.ENGLISH, "%03d", index + 1), left + 18, top + h / 2f + num.getTextSize() * 0.36f, num);
   // tile
@@ -238,7 +240,7 @@ final class ListPanelView extends DView {
   name.setTypeface(k > 0.5f ? Design.regular : Design.light);
   name.setTextSize(nameSize);
   name.setColor(Design.alpha(Design.lerp(0xFFC9D6E0, 0xFFFFFFFF, k), a));
-  float group = nameSize * 0.78f + 14f;
+  float group = nameSize * 0.78f + 17f;
   float base = top + (h - group) / 2f + nameSize * 0.78f;
   String label = e.label;
   float maxW = right - 56 - nx;
@@ -247,7 +249,7 @@ final class ListPanelView extends DView {
   c.drawText(label, nx, base, name);
   boolean fav = favs != null && favs.isFav(e);
   cat.setColor(Design.alpha(Design.lerp(Design.DIM, Design.CYAN, k), a));
-  c.drawText(fav ? e.category + "  ★" : e.category, nx, base + 14, cat);
+  c.drawText(fav ? e.category + "  ★" : e.category, nx, base + 17, cat);
   if (k > 0.3f) {
    fill.setColor(Design.alpha(Design.CYAN, k * a));
    android.graphics.Path tri = new android.graphics.Path();
